@@ -1,0 +1,146 @@
+<?xml version="1.0" ?>
+<mujoco model="mecanumbot">
+
+  <!-- Materials -->
+  <asset>
+    <material name="darkgrey" rgba="0.1 0.1 0.1 1"/>
+    <material name="grey" rgba="0.5 0.5 0.5 1"/>
+    <material name="blue" rgba="0 0 0.8 1"/>
+    <mesh file="SO101/assets/waveshare_mounting_plate_so101_v2.stl"/>
+    <mesh file="SO101/assets/sts3215_03a_v1.stl"/>
+    <mesh file="SO101/assets/motor_holder_so101_base_v1.stl"/>
+    <mesh file="SO101/assets/wrist_roll_follower_so101_v1.stl"/>
+    <mesh file="SO101/assets/moving_jaw_so101_v1.stl"/>
+    <mesh file="SO101/assets/base_motor_holder_so101_v1.stl"/>
+    <mesh file="SO101/assets/upper_arm_so101_v1.stl"/>
+    <mesh file="SO101/assets/wrist_roll_pitch_so101_v2.stl"/>
+    <mesh file="SO101/assets/under_arm_so101_v1.stl"/>
+    <mesh file="SO101/assets/rotation_pitch_so101_v1.stl"/>
+    <mesh file="SO101/assets/motor_holder_so101_wrist_v1.stl"/>
+    <mesh file="SO101/assets/sts3215_03a_no_horn_v1.stl"/>
+    <mesh file="SO101/assets/base_so101_v2.stl"/>
+    <material name="base_motor_holder_so101_v1_material" rgba="1 0.82 0.12 1"/>
+    <material name="base_so101_v2_material" rgba="1 0.82 0.12 1"/>
+    <material name="sts3215_03a_v1_material" rgba="0.1 0.1 0.1 1"/>
+    <material name="waveshare_mounting_plate_so101_v2_material" rgba="1 0.82 0.12 1"/>
+    <material name="motor_holder_so101_base_v1_material" rgba="1 0.82 0.12 1"/>
+    <material name="rotation_pitch_so101_v1_material" rgba="1 0.82 0.12 1"/>
+    <material name="upper_arm_so101_v1_material" rgba="1 0.82 0.12 1"/>
+    <material name="under_arm_so101_v1_material" rgba="1 0.82 0.12 1"/>
+    <material name="motor_holder_so101_wrist_v1_material" rgba="1 0.82 0.12 1"/>
+    <material name="sts3215_03a_no_horn_v1_material" rgba="0.1 0.1 0.1 1.0"/>
+    <material name="wrist_roll_pitch_so101_v2_material" rgba="1 0.82 0.12 1"/>
+    <material name="wrist_roll_follower_so101_v1_material" rgba="1 0.82 0.12 1"/>
+    <material name="moving_jaw_so101_v1_material" rgba="1 0.82 0.12 1"/>
+    <!-- Meshes for wheels -->
+    <mesh name="fl_wheel_mesh" file="mecanum/meshes/fl_wheel_link.STL" scale="0.6 0.6 0.6"/>
+    <mesh name="fr_wheel_mesh" file="mecanum/meshes/fr_wheel_link.STL" scale="0.6 0.6 0.6"/>
+    <mesh name="rl_wheel_mesh" file="mecanum/meshes/rl_wheel_link.STL" scale="0.6 0.6 0.6"/>
+    <mesh name="rr_wheel_mesh" file="mecanum/meshes/rr_wheel_link.STL" scale="0.6 0.6 0.6"/>
+  </asset>
+  <default>
+    <default class="so101_new_calib">
+      <joint damping="1" frictionloss="0.1" armature="0.005"/>
+      <position kp="50"/>
+      <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+      </default>
+      <default class="collision">
+        <geom group="3"/>
+      </default>
+    </default>
+  </default>
+  <!-- Additional joints_properties.xml -->
+  <default>
+    <default class="sts3215">
+      <geom contype="0" conaffinity="0"/>
+      <joint damping="0.60" frictionloss="0.052" armature="0.028"/>
+      <!-- For lerobot this are not exactly the motor params as the Kp and Kd not map 1-to-1 thus motor idendification with lerobot Kp=16 and Kd=32 should actually be done -->
+      <position kp="17.8"/>
+    </default>
+    <default class="backlash">
+      <!-- +/- 0.5° of backlash -->
+      <joint damping="0.01" frictionloss="0" armature="0.01" limited="true" range="-0.008726646259971648 0.008726646259971648"/>
+    </default>
+  </default>
+  <worldbody>
+    <!-- Base footprint (ground reference) -->
+    <body name="base_footprint" pos="0 0 0">
+      <!-- <joint type="free"/> -->
+      <!-- Base link -->
+      <body name="base_link" pos="0 0 0.05" euler="0 0 3.14">
+        <geom name="base_geom_visual" type="box" class="visual" size="0.2 0.14 0.01" material="grey"/>
+        <geom name="base_geom_collision" type="box" class="collision" size="0.2 0.14 0.01" material="grey"/>
+
+        <!-- Corrected base inertia: m=1kg, box=0.4x0.28x0.02 -->
+        <inertial pos="0 0 0" mass="4.0" diaginertia="0.006567 0.013367 0.0196"/>
+        
+        <!-- Front-left wheel -->
+        <body name="fl_wheel_link" pos="-0.18 -0.16 -0.03" euler="-1.570796327 0 0">
+          <joint name="fl_wheel_joint" type="hinge" axis="0 0 -1" />
+          <!-- Visual mesh -->
+          <geom name="fl_wheel_visual" class="visual" type="mesh" mesh="fl_wheel_mesh" material="darkgrey" euler="0 1.570796327 0" pos="0 0 0.015"/>
+          <!-- Collision geometry - cylinder for wheel contact -->
+          <geom name="fl_wheel_collision" class="collision" type="cylinder" size="0.034 0.014" material="darkgrey" 
+                friction="1.2 0.05 0.05" condim="3"/>
+          <!-- Corrected wheel inertia: m=0.5kg, cylinder r=0.034, w=0.028 -->
+          <inertial pos="0 0 0" mass="0.5" diaginertia="0.000176 0.000176 0.000289"/>
+        </body>
+
+        <!-- Front-right wheel -->
+        <body name="fr_wheel_link" pos="-0.18 0.16 -0.03" euler="1.570796327 0 0">
+          <joint name="fr_wheel_joint" type="hinge" axis="0 0 1" />
+          <!-- Visual mesh -->
+          <geom name="fr_wheel_visual" class="visual" type="mesh" mesh="fr_wheel_mesh" material="darkgrey" euler="0 1.570796327 0" pos="0 0 0.015"/>
+          <!-- Collision geometry -->
+          <geom name="fr_wheel_collision" class="collision" type="cylinder" size="0.034 0.014" material="darkgrey" 
+                friction="1.2 0.05 0.05" condim="3"/>
+          <!-- Corrected wheel inertia -->
+          <inertial pos="0 0 0" mass="0.5" diaginertia="0.000176 0.000176 0.000289"/>
+        </body>
+
+        <!-- Rear-left wheel -->
+        <body name="rl_wheel_link" pos="0.18 -0.16 -0.03" euler="-1.570796327 0 0 ">
+          <joint name="rl_wheel_joint" type="hinge" axis="0 0 -1" />
+          <!-- Visual mesh -->
+          <geom name="rl_wheel_visual" class="visual" type="mesh" mesh="rl_wheel_mesh" material="darkgrey" euler="0 1.570796327 0" pos="0 0 0.015"/>
+          <!-- Collision geometry -->
+          <geom name="rl_wheel_collision" class="collision" type="cylinder" size="0.034 0.014" material="darkgrey" 
+                friction="1.2 0.05 0.05" condim="3"/>
+          <!-- Corrected wheel inertia -->
+          <inertial pos="0 0 0" mass="0.5" diaginertia="0.000176 0.000176 0.000289"/>
+        </body>
+
+        <!-- Rear-right wheel -->
+        <body name="rr_wheel_link" pos="0.18 0.16 -0.03" euler="1.570796327 0 0">
+          <joint name="rr_wheel_joint" type="hinge" axis="0 0 1" />
+          <!-- Visual mesh -->
+          <geom name="rr_wheel_visual" class="visual" type="mesh" mesh="rr_wheel_mesh" material="darkgrey" euler="0 1.570796327 0" pos="0 0 0.015"/>
+          <!-- Collision geometry -->
+          <geom name="rr_wheel_collision" class="collision" type="cylinder" size="0.034 0.014" material="darkgrey" 
+                friction="1.2 0.05 0.05" condim="3"/>
+          <!-- Corrected wheel inertia -->
+          <inertial pos="0 0 0" mass="0.5" diaginertia="0.000176 0.000176 0.000289"/>
+        </body>
+      </body>
+      <include file="SO101/so101_new_calib1.xml" />
+
+    </body>
+  </worldbody>
+
+
+  <!-- Actuators for wheels -->
+  <actuator>
+    <velocity joint="fl_wheel_joint" name="fl_wheel_motor" kv="0.1" ctrlrange="-10.47 10.47"/>
+    <velocity joint="fr_wheel_joint" name="fr_wheel_motor" kv="0.1" ctrlrange="-10.47 10.47"/>
+    <velocity joint="rl_wheel_joint" name="rl_wheel_motor" kv="0.1" ctrlrange="-10.47 10.47"/>
+    <velocity joint="rr_wheel_joint" name="rr_wheel_motor" kv="0.1" ctrlrange="-10.47 10.47"/>
+    <position class="sts3215" name="shoulder_pan" joint="shoulder_pan" forcerange="-3.35 3.35" ctrlrange="-1.91986 1.91986"/>
+    <position class="sts3215" name="shoulder_lift" joint="shoulder_lift" forcerange="-3.35 3.35" ctrlrange="-1.74533 1.74533"/>
+    <position class="sts3215" name="elbow_flex" joint="elbow_flex" forcerange="-3.35 3.35" ctrlrange="-1.69 1.69"/>
+    <position class="sts3215" name="wrist_flex" joint="wrist_flex" forcerange="-3.35 3.35" ctrlrange="-1.65806 1.65806"/>
+    <position class="sts3215" name="wrist_roll" joint="wrist_roll" forcerange="-3.35 3.35" ctrlrange="-2.74385 2.84121"/>
+    <position class="sts3215" name="gripper" joint="gripper" forcerange="-3.35 3.35" ctrlrange="-0.17453 1.74533"/>
+  </actuator>
+
+</mujoco>

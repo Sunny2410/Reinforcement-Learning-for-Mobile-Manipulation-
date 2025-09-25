@@ -1,0 +1,60 @@
+Tue Sep 23 17:09:44 2025
+WARNING: mju_openResource: unknown file '/asset/scene.xml'
+
+Tue Sep 23 17:09:49 2025
+WARNING: mju_openResource: unknown file 'asset//home/sunny24/SO-ARM100/Simulation/SO101/so101_new_calib.xml'
+
+Tue Sep 23 17:10:05 2025
+WARNING: mju_openResource: unknown file 'scene.xml'
+
+Tue Sep 23 17:10:22 2025
+WARNING: mju_openResource: unknown file 'scene.xml'
+
+Tue Sep 23 17:10:27 2025
+WARNING: mju_openResource: unknown file 'asset/../home/sunny24/SO-ARM100/Simulation/SO101/so101_new_calib.xml'
+
+Tue Sep 23 17:11:03 2025
+WARNING: mju_openResource: unknown file 'asset//home/sunny24/SO-ARM100/Simulation/SO101/so101_new_calib.xml'
+
+Tue Sep 23 17:11:23 2025
+WARNING: mju_openResource: unknown file 'asset//home/sunny24/SO-ARM100/Simulation/SO101/so101_new_calib.xml'
+
+Tue Sep 23 17:13:46 2025
+WARNING: mju_openResource: unknown file 'asset//home/sunny24/SO-ARM100/Simulation/SO101/so101_new_calib.xml'
+
+Tue Sep 23 17:13:57 2025
+WARNING: mju_openResource: unknown file '/home/sunny24/rl_mm/asset//home/sunny24/SO-ARM100/Simulation/SO101/so101_new_calib.xml'
+
+Tue Sep 23 18:17:24 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 12. The simulation is unstable. Time = 0.0080.
+
+Tue Sep 23 18:29:50 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 12. The simulation is unstable. Time = 0.0080.
+
+Tue Sep 23 18:44:07 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 7. The simulation is unstable. Time = 0.0120.
+
+Tue Sep 23 18:52:29 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 4. The simulation is unstable. Time = 0.0260.
+
+Tue Sep 23 18:55:12 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 6. The simulation is unstable. Time = 0.0160.
+
+Tue Sep 23 18:56:03 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 6. The simulation is unstable. Time = 0.0160.
+
+Tue Sep 23 18:56:12 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 6. The simulation is unstable. Time = 0.0060.
+
+Tue Sep 23 18:57:32 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 7. The simulation is unstable. Time = 0.0080.
+
+Tue Sep 23 20:00:41 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 1.9700.
+
+Tue Sep 23 20:01:30 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 5.9730.
+
+Tue Sep 23 20:04:34 2025
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 3.0950.
+

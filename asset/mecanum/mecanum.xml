@@ -1,0 +1,99 @@
+<?xml version="1.0" ?>
+<mujoco model="mecanumbot">
+
+  <!-- Materials -->
+  <asset>
+    <material name="darkgrey" rgba="0.1 0.1 0.1 1"/>
+    <material name="grey" rgba="0.5 0.5 0.5 1"/>
+    <material name="blue" rgba="0 0 0.8 1"/>
+    
+    <!-- Meshes for wheels -->
+    <mesh name="fl_wheel_mesh" file="meshes/fl_wheel_link.STL" scale="0.6 0.6 0.6"/>
+    <mesh name="fr_wheel_mesh" file="meshes/fr_wheel_link.STL" scale="0.6 0.6 0.6"/>
+    <mesh name="rl_wheel_mesh" file="meshes/rl_wheel_link.STL" scale="0.6 0.6 0.6"/>
+    <mesh name="rr_wheel_mesh" file="meshes/rr_wheel_link.STL" scale="0.6 0.6 0.6"/>
+  </asset>
+    <default>
+
+      <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+      </default>
+      <default class="collision">
+        <geom group="3"/>
+      </default>
+    </default>
+
+  <worldbody>
+    <!-- Base footprint (ground reference) -->
+    <body name="base_footprint" pos="0 0 0">
+      <joint type="free"/>
+      <!-- Base link -->
+      <body name="base_link" pos="0 0 0" euler="0 0 3.14">
+        <geom name="base_geom_visual" type="box" class="visual" size="0.2 0.14 0.01" material="grey"/>
+        <geom name="base_geom_collision" type="box" class="collision" size="0.2 0.14 0.01" material="grey"/>
+
+        <!-- Corrected base inertia: m=1kg, box=0.4x0.28x0.02 -->
+        <inertial pos="0 0 0" mass="4.0" diaginertia="0.006567 0.013367 0.0196"/>
+        
+        <!-- Front-left wheel -->
+        <body name="fl_wheel_link" pos="-0.18 -0.16 -0.03" euler="-1.570796327 0 0">
+          <joint name="fl_wheel_joint" type="hinge" axis="0 0 -1" />
+          <!-- Visual mesh -->
+          <geom name="fl_wheel_visual" class="visual" type="mesh" mesh="fl_wheel_mesh" material="darkgrey" euler="0 1.570796327 0" pos="0 0 0.015"/>
+          <!-- Collision geometry - cylinder for wheel contact -->
+          <geom name="fl_wheel_collision" class="collision" type="cylinder" size="0.034 0.014" material="darkgrey" 
+                friction="1.2 0.05 0.05" condim="3"/>
+          <!-- Corrected wheel inertia: m=0.5kg, cylinder r=0.034, w=0.028 -->
+          <inertial pos="0 0 0" mass="0.5" diaginertia="0.000176 0.000176 0.000289"/>
+        </body>
+
+        <!-- Front-right wheel -->
+        <body name="fr_wheel_link" pos="-0.18 0.16 -0.03" euler="1.570796327 0 0">
+          <joint name="fr_wheel_joint" type="hinge" axis="0 0 1" />
+          <!-- Visual mesh -->
+          <geom name="fr_wheel_visual" class="visual" type="mesh" mesh="fr_wheel_mesh" material="darkgrey" euler="0 1.570796327 0" pos="0 0 0.015"/>
+          <!-- Collision geometry -->
+          <geom name="fr_wheel_collision" class="collision" type="cylinder" size="0.034 0.014" material="darkgrey" 
+                friction="1.2 0.05 0.05" condim="3"/>
+          <!-- Corrected wheel inertia -->
+          <inertial pos="0 0 0" mass="0.5" diaginertia="0.000176 0.000176 0.000289"/>
+        </body>
+
+        <!-- Rear-left wheel -->
+        <body name="rl_wheel_link" pos="0.18 -0.16 -0.03" euler="-1.570796327 0 0 ">
+          <joint name="rl_wheel_joint" type="hinge" axis="0 0 -1" />
+          <!-- Visual mesh -->
+          <geom name="rl_wheel_visual" class="visual" type="mesh" mesh="rl_wheel_mesh" material="darkgrey" euler="0 1.570796327 0" pos="0 0 0.015"/>
+          <!-- Collision geometry -->
+          <geom name="rl_wheel_collision" class="collision" type="cylinder" size="0.034 0.014" material="darkgrey" 
+                friction="1.2 0.05 0.05" condim="3"/>
+          <!-- Corrected wheel inertia -->
+          <inertial pos="0 0 0" mass="0.5" diaginertia="0.000176 0.000176 0.000289"/>
+        </body>
+
+        <!-- Rear-right wheel -->
+        <body name="rr_wheel_link" pos="0.18 0.16 -0.03" euler="1.570796327 0 0">
+          <joint name="rr_wheel_joint" type="hinge" axis="0 0 1" />
+          <!-- Visual mesh -->
+          <geom name="rr_wheel_visual" class="visual" type="mesh" mesh="rr_wheel_mesh" material="darkgrey" euler="0 1.570796327 0" pos="0 0 0.015"/>
+          <!-- Collision geometry -->
+          <geom name="rr_wheel_collision" class="collision" type="cylinder" size="0.034 0.014" material="darkgrey" 
+                friction="1.2 0.05 0.05" condim="3"/>
+          <!-- Corrected wheel inertia -->
+          <inertial pos="0 0 0" mass="0.5" diaginertia="0.000176 0.000176 0.000289"/>
+        </body>
+        
+      </body>
+    </body>
+  </worldbody>
+
+
+  <!-- Actuators for wheels -->
+  <actuator>
+    <velocity joint="fl_wheel_joint" name="fl_wheel_motor" kv="0.1" ctrlrange="-10.47 10.47"/>
+    <velocity joint="fr_wheel_joint" name="fr_wheel_motor" kv="0.1" ctrlrange="-10.47 10.47"/>
+    <velocity joint="rl_wheel_joint" name="rl_wheel_motor" kv="0.1" ctrlrange="-10.47 10.47"/>
+    <velocity joint="rr_wheel_joint" name="rr_wheel_motor" kv="0.1" ctrlrange="-10.47 10.47"/>
+  </actuator>
+
+</mujoco>

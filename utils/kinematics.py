@@ -257,7 +257,7 @@ class Kinematics:
         if self.use_mink:
             try:
                 # Load MuJoCo model directly from fixed path
-                mj_model = mujoco.MjModel.from_xml_path("/home/sunny24/rl_mm/asset/SO101/so101_new_calib.xml")
+                mj_model = mujoco.MjModel.from_xml_path("rl_mm/asset/SO101/so101_new_calib.xml")
                 self._mink_configuration = mink.Configuration(mj_model)
                 # Initialize joint positions to zeros
             except Exception as e:

@@ -1,2 +1,4 @@
-from rl_mm.robots.MobileManipulator import MobileManipulator
-from rl_mm.robots.mobileSO import MobileSO101
+from .MobileManipulator import MobileManipulator
+from .mobileSO import MobileSO101
+
+__all__ = ['MobileManipulator', 'MobileSO101']

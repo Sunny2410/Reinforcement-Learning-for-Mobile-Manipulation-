@@ -1,1 +1,3 @@
-from rl_mm.props.primitive import Primitive
+from .primitive import Primitive
+
+__all__ = ['Primitive']

@@ -1,17 +1,17 @@
-from rl_mm.robots import MobileSO101
-from dm_control import mjcf
-import imageio
+import mujoco
+import mujoco.viewer
 
-if __name__ == "__main__":
-    robot = MobileSO101(name="test_robot")
-    print("Load robot succesfull:", robot)
-    print("Jointarm:", robot.joints_arm)
-    print("Jointbase:", robot.joints_base)
+# Đường dẫn tới file XML
+xml_path = "rl_mm/asset/scene.xml"
 
-    physics = mjcf.Physics.from_mjcf_model(robot.mjcf_model)
+# Tải mô hình
+model = mujoco.MjModel.from_xml_path(xml_path)
+data = mujoco.MjData(model)
 
-    # Dùng free camera (-1) nếu model không có fixed camera
-    img = physics.render(height=480, width=480, camera_id=-1)
+# Tạo viewer để render
+viewer = mujoco.viewer.launch_passive(model, data)
 
-    imageio.imwrite("rl_mm/test/robot.png", img)
-    print("Image is saved")
+# Vòng lặp mô phỏng
+while True:
+    mujoco.mj_step(model, data)  # bước mô phỏng
+    viewer.sync()                # cập nhật render

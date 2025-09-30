@@ -1,1 +1,3 @@
-from manipulator_mujoco.arenas.standard import StandardArena
+from .standard import StandardArena
+
+__all__ = ['StandardArena']

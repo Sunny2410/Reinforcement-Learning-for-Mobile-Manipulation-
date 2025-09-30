@@ -912,8 +912,6 @@ def get_pose_error(target_pose, current_pose):
     error[3:] = rot_err
     return error
 
-
-
 def matrix_inverse(matrix):
     """
     Helper function to have an efficient matrix inversion function.
@@ -925,3 +923,41 @@ def matrix_inverse(matrix):
         np.array: 2d-array representing the matrix inverse
     """
     return np.linalg.inv(matrix)
+
+def quat2yaw(quat):
+    """
+    Convert quaternion (x,y,z,w) to yaw angle in radians.
+    """
+    # Chuyển quaternion sang rotation matrix
+    R = quat2mat(quat)
+    # Chuyển rotation matrix sang euler angles (roll, pitch, yaw)
+    euler = mat2euler(R, axes="sxyz")
+    # euler = [roll, pitch, yaw]
+    return euler[2]
+
+def quat_to_euler(quat: np.ndarray) -> tuple:
+    """
+    Chuyển quaternion [qx, qy, qz, qw] sang Euler angles (roll, pitch, yaw)
+    """
+    qx, qy, qz, qw = quat  # unpack theo MuJoCo
+    # roll (x-axis rotation)
+    roll = np.arctan2(2 * (qw*qx + qy*qz), 1 - 2 * (qx**2 + qy**2))
+    # pitch (y-axis rotation)
+    pitch = np.arcsin(np.clip(2 * (qw*qy - qz*qx), -1.0, 1.0))
+    # yaw (z-axis rotation)
+    yaw = np.arctan2(2 * (qw*qz + qx*qy), 1 - 2 * (qy**2 + qz**2))
+    return roll, pitch, yaw
+
+def euler_to_quat(roll: float, pitch: float, yaw: float) -> np.ndarray:
+    """
+    Chuyển Euler angles (roll, pitch, yaw) sang quaternion [qx, qy, qz, qw]
+    """
+    cr, cp, cy = np.cos(roll/2), np.cos(pitch/2), np.cos(yaw/2)
+    sr, sp, sy = np.sin(roll/2), np.sin(pitch/2), np.sin(yaw/2)
+
+    qw = cr*cp*cy + sr*sp*sy
+    qx = sr*cp*cy - cr*sp*sy
+    qy = cr*sp*cy + sr*cp*sy
+    qz = cr*cp*sy - sr*sp*cy
+
+    return np.array([qx, qy, qz, qw])

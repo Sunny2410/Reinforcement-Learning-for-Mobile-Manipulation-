@@ -2,7 +2,7 @@
     <compiler angle="radian" assetdir="assets" autolimits="true"/>
 
     <option timestep="0.004" integrator="implicitfast" gravity="0 0 -9.810"/>
-    <include file="robot.xml" />
+    <include file="robotfull.xml" />
 
     <visual>
         <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />

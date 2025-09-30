@@ -1,0 +1,70 @@
+# Robot Action Configuration
+# All distances are in centimeters (cm) and angles in degrees (deg)
+
+base_movements:
+  move_forward:
+    step: 5.0  # cm
+    description: "Move base forward"
+  move_backward:
+    step: 5.0  # cm
+    description: "Move base backward" 
+  # move_left:
+  #   step: 5.0  # cm
+  #   description: "Move base left"
+  # move_right:
+  #   step: 5.0  # cm
+  #   description: "Move base right"
+  turn_left:
+    step: 15.0  # deg
+    description: "Rotate base counter-clockwise"
+  turn_right:
+    step: 15.0  # deg
+    description: "Rotate base clockwise"
+
+arm_cartesian:
+  arm_forward:
+    step: 5.0  # cm
+    description: "Move end-effector forward in X"
+  arm_backward:
+    step: 5.0  # cm
+    description: "Move end-effector backward in X"
+  arm_left:
+    step: 5.0  # cm
+    description: "Move end-effector left in Y"
+  arm_right:
+    step: 5.0  # cm
+    description: "Move end-effector right in Y"
+  arm_up:
+    step: 5.0  # cm
+    description: "Move end-effector up in Z"
+  arm_down:
+    step: 5.0  # cm
+    description: "Move end-effector down in Z"
+
+wrist_movements:
+  wrist_roll_left:
+    step: 10.0  # deg
+    description: "Rotate wrist roll counter-clockwise"
+  wrist_roll_right:
+    step: 10.0  # deg
+    description: "Rotate wrist roll clockwise"
+  wrist_pitch_up:
+    step: 10.0  # deg
+    description: "Rotate wrist pitch up"
+  wrist_pitch_down:
+    step: 10.0  # deg
+    description: "Rotate wrist pitch down"
+  wrist_yaw_left:
+    step: 10.0  # deg
+    description: "Rotate wrist yaw counter-clockwise"
+  wrist_yaw_right:
+    step: 10.0  # deg
+    description: "Rotate wrist yaw clockwise"
+
+gripper:
+  gripper_open:
+    step: 1.0  # cm (gripper width)
+    description: "Open gripper"
+  gripper_close:
+    step: 1.0  # cm (gripper width)
+    description: "Close gripper"

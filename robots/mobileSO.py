@@ -8,7 +8,7 @@ _MOBILESO101_XML = os.path.join(
 
 # Các joint thuộc base (các bánh xe)
 _BASE_JOINTS = (
-    'fl_wheel_motor',
+    'fl_wheel_joint',
     'fr_wheel_joint',
     'rl_wheel_joint',
     'rr_wheel_joint',
@@ -25,14 +25,16 @@ _ARM_JOINTS = (
 )
 
 # End-effector site
-_EEF_SITE = 'eef_site'
+_EEF_SITE = 'gripperframe'
 
+_BASE_SITE = 'baseframe'
 
 class MobileSO101(MobileManipulator):
     def __init__(self, name: str = None):
         super().__init__(
             xml_path=_MOBILESO101_XML,
             eef_site_name=_EEF_SITE,
+            base_site_name=_BASE_SITE,
             joints_arm=_ARM_JOINTS,
             joints_base=_BASE_JOINTS,
             name=name

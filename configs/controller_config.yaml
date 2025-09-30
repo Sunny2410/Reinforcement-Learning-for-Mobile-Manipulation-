@@ -1,0 +1,23 @@
+arm_controller:
+  pid:
+    Kp: 1.0
+    Ki: 0.001
+    Kd: 0.5
+  qpos_tol: 0.04
+  max_step_size: 0.2  # giới hạn step mỗi vòng lặp
+
+base_controller:
+  pid:
+    Kp: 0.5
+    Ki: 0.0
+    Kd: 0.0
+  pos_tol: 0.01 
+  max_step_size: 0.1
+
+gripper_controller:
+  pid:
+    Kp: 0.5
+    Ki: 0.0
+    Kd: 0.0
+  qpos_tol: 0.01
+  max_step_size: 0.005

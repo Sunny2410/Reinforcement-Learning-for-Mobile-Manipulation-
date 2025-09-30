@@ -66,7 +66,6 @@
   <worldbody>
     <!-- Base footprint (ground reference) -->
     <body name="base_footprint" pos="0 0 0">
-      <!-- <joint type="free"/> -->
       <!-- Base link -->
       <body name="base_link" pos="0 0 0.05" euler="0 0 3.14">
         <geom name="base_geom_visual" type="box" class="visual" size="0.2 0.14 0.01" material="grey"/>

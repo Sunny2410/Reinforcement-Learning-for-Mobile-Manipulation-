@@ -210,9 +210,8 @@ class SO101Arm2(gym.Env):
         if not self.manager.is_any_moving():
             cmd = self.manager.step(action)
             if cmd is not None:
-                self._apply_command(cmd)
-                action_executed = True
-        
+                # self._apply_command(cmd)
+                action_executed = False
         # Chạy nhiều physics steps để đẩy nhanh quá trình
         substep_count = 0
         for _ in range(1000):
@@ -220,7 +219,6 @@ class SO101Arm2(gym.Env):
             if cmd:
                 self._apply_command(cmd)
                 action_executed = True
-            
             self.physics.step()
             self.physics.forward()
             substep_count += 1
@@ -234,7 +232,7 @@ class SO101Arm2(gym.Env):
             self.base_steps += 1
         if is_arm_action:
             self.arm_steps += 1
-            
+        
         self.physics.step()
         self.physics.forward()
 

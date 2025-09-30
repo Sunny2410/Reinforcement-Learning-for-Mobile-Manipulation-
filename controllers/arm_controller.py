@@ -106,7 +106,7 @@ class ArmController:
         if not self._is_moving or self._qpos_target is None:
             target_set = self.set_target(action_type, step)
             if not target_set:
-                curr_qpos = np.array([self.kinematics.physics.named.data.qpos[j] for j in self.joints_arm]).ravel()
+                curr_qpos = self._qpos_target
                 return {"arm_qpos": curr_qpos}
 
         return self.update_control_loop()

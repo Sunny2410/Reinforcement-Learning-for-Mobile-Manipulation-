@@ -1,76 +1,53 @@
 import gymnasium as gym
-import rl_mm
 import numpy as np
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import BaseCallback
-from tqdm import tqdm
+from PIL import Image  # để lưu ảnh
 
 # -----------------------------
-# 1. Create environment
+# 1. Setup environment
 # -----------------------------
 env_id = "rl_mm/SO101-v1"
-env = gym.make(env_id)
+test_env = gym.make(env_id, render_mode="rgb_array")  # <-- đổi từ human sang rgb_array
+obs, info = test_env.reset(seed=42)
+
+# Lấy env gốc nếu cần truy cập manager / robot
+raw_env = test_env.unwrapped
 
 # -----------------------------
-# 2. Define PPO model
+# 2. Load trained PPO model
 # -----------------------------
-model = PPO(
-    policy="MlpPolicy",
-    env=env,
-    batch_size=64,
-    n_steps=2048,
-    gamma=0.99,
-    learning_rate=3e-4,
-    verbose=0   # tắt log mặc định, để mình điều khiển bằng tqdm
+model_path = "ppo_subproc_so101"  # đường dẫn model
+model = PPO.load(
+    model_path,
 )
 
 # -----------------------------
-# 3. Callback dùng tqdm
+# 3. Test loop + save frames
 # -----------------------------
-class ProgressBarCallback(BaseCallback):
-    def __init__(self, total_timesteps: int, verbose=0):
-        super().__init__(verbose)
-        self.total_timesteps = total_timesteps
-        self.pbar = None
-
-    def _on_training_start(self):
-        self.pbar = tqdm(total=self.total_timesteps, desc="Training progress")
-
-    def _on_step(self) -> bool:
-        # cập nhật thanh tiến độ theo số timesteps đã chạy
-        self.pbar.n = self.num_timesteps
-        self.pbar.refresh()
-        return True
-
-    def _on_training_end(self):
-        self.pbar.n = self.total_timesteps
-        self.pbar.refresh()
-        self.pbar.close()
-
-# -----------------------------
-# 4. Train the model
-# -----------------------------
-total_timesteps = 1000000
-callback = ProgressBarCallback(total_timesteps)
-model.learn(total_timesteps=total_timesteps, callback=callback)
-
-# -----------------------------
-# 5. Save the model
-# -----------------------------
-model.save("ppo_tqdm_so101")
-
-# -----------------------------
-# 6. Test the trained model
-# -----------------------------
-test_env = gym.make(env_id, render_mode="human")
-obs, info = test_env.reset(seed=42)
-
-for _ in range(1000):
+n_steps = 20
+for step in range(n_steps):
+    # Dự đoán action từ model
     action, _states = model.predict(obs, deterministic=True)
-    print("Test action chosen:", action)  # In ra action test
+    
+    # Convert action array -> int nếu cần
+    if isinstance(action, np.ndarray):
+        action = int(action.item())
+
+    print(f"Step {step} - Action chosen:", action)
+
+    # Thực hiện action
     obs, reward, terminated, truncated, info = test_env.step(action)
-    test_env.render()
+
+    # Render ra array (RGB) và lưu ảnh
+    frame = test_env.render()  # trả về numpy array
+    img = Image.fromarray(frame)
+    img.save(f"frames/frame_{step:04d}.png")  # lưu theo thứ tự
+
+    # Reset nếu episode kết thúc
     if terminated or truncated:
         obs, info = test_env.reset()
 
+# -----------------------------
+# 4. Close environment
+# -----------------------------
 test_env.close()

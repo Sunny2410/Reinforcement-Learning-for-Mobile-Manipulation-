@@ -42,23 +42,23 @@
     <material name="wrist_roll_pitch_so101_v2_material" rgba="1 0.82 0.12 1"/>
     <material name="wrist_roll_follower_so101_v1_material" rgba="1 0.82 0.12 1"/>
     <material name="moving_jaw_so101_v1_material" rgba="1 0.82 0.12 1"/>
-    <mesh name="waveshare_mounting_plate_so101_v2" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/waveshare_mounting_plate_so101_v2.stl"/>
-    <mesh name="sts3215_03a_v1" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/sts3215_03a_v1.stl"/>
-    <mesh name="motor_holder_so101_base_v1" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/motor_holder_so101_base_v1.stl"/>
-    <mesh name="wrist_roll_follower_so101_v1" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/wrist_roll_follower_so101_v1.stl"/>
-    <mesh name="moving_jaw_so101_v1" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/moving_jaw_so101_v1.stl"/>
-    <mesh name="base_motor_holder_so101_v1" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/base_motor_holder_so101_v1.stl"/>
-    <mesh name="upper_arm_so101_v1" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/upper_arm_so101_v1.stl"/>
-    <mesh name="wrist_roll_pitch_so101_v2" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/wrist_roll_pitch_so101_v2.stl"/>
-    <mesh name="under_arm_so101_v1" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/under_arm_so101_v1.stl"/>
-    <mesh name="rotation_pitch_so101_v1" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/rotation_pitch_so101_v1.stl"/>
-    <mesh name="motor_holder_so101_wrist_v1" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/motor_holder_so101_wrist_v1.stl"/>
-    <mesh name="sts3215_03a_no_horn_v1" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/sts3215_03a_no_horn_v1.stl"/>
-    <mesh name="base_so101_v2" content_type="model/stl" file="/home/sunny24/rl_mm/asset/SO101/assets/base_so101_v2.stl"/>
-    <mesh name="fl_wheel_mesh" content_type="model/stl" file="/home/sunny24/rl_mm/asset/mecanum/meshes/fl_wheel_link.STL" scale="0.6 0.6 0.6"/>
-    <mesh name="fr_wheel_mesh" content_type="model/stl" file="/home/sunny24/rl_mm/asset/mecanum/meshes/fr_wheel_link.STL" scale="0.6 0.6 0.6"/>
-    <mesh name="rl_wheel_mesh" content_type="model/stl" file="/home/sunny24/rl_mm/asset/mecanum/meshes/rl_wheel_link.STL" scale="0.6 0.6 0.6"/>
-    <mesh name="rr_wheel_mesh" content_type="model/stl" file="/home/sunny24/rl_mm/asset/mecanum/meshes/rr_wheel_link.STL" scale="0.6 0.6 0.6"/>
+    <mesh name="waveshare_mounting_plate_so101_v2" content_type="model/stl" file="/rl_mm/asset/SO101/assets/waveshare_mounting_plate_so101_v2.stl"/>
+    <mesh name="sts3215_03a_v1" content_type="model/stl" file="/rl_mm/asset/SO101/assets/sts3215_03a_v1.stl"/>
+    <mesh name="motor_holder_so101_base_v1" content_type="model/stl" file="/rl_mm/asset/SO101/assets/motor_holder_so101_base_v1.stl"/>
+    <mesh name="wrist_roll_follower_so101_v1" content_type="model/stl" file="/rl_mm/asset/SO101/assets/wrist_roll_follower_so101_v1.stl"/>
+    <mesh name="moving_jaw_so101_v1" content_type="model/stl" file="/rl_mm/asset/SO101/assets/moving_jaw_so101_v1.stl"/>
+    <mesh name="base_motor_holder_so101_v1" content_type="model/stl" file="/rl_mm/asset/SO101/assets/base_motor_holder_so101_v1.stl"/>
+    <mesh name="upper_arm_so101_v1" content_type="model/stl" file="/rl_mm/asset/SO101/assets/upper_arm_so101_v1.stl"/>
+    <mesh name="wrist_roll_pitch_so101_v2" content_type="model/stl" file="/rl_mm/asset/SO101/assets/wrist_roll_pitch_so101_v2.stl"/>
+    <mesh name="under_arm_so101_v1" content_type="model/stl" file="/rl_mm/asset/SO101/assets/under_arm_so101_v1.stl"/>
+    <mesh name="rotation_pitch_so101_v1" content_type="model/stl" file="/rl_mm/asset/SO101/assets/rotation_pitch_so101_v1.stl"/>
+    <mesh name="motor_holder_so101_wrist_v1" content_type="model/stl" file="/rl_mm/asset/SO101/assets/motor_holder_so101_wrist_v1.stl"/>
+    <mesh name="sts3215_03a_no_horn_v1" content_type="model/stl" file="/rl_mm/asset/SO101/assets/sts3215_03a_no_horn_v1.stl"/>
+    <mesh name="base_so101_v2" content_type="model/stl" file="/rl_mm/asset/SO101/assets/base_so101_v2.stl"/>
+    <mesh name="fl_wheel_mesh" content_type="model/stl" file="/rl_mm/asset/mecanum/meshes/fl_wheel_link.STL" scale="0.6 0.6 0.6"/>
+    <mesh name="fr_wheel_mesh" content_type="model/stl" file="/rl_mm/asset/mecanum/meshes/fr_wheel_link.STL" scale="0.6 0.6 0.6"/>
+    <mesh name="rl_wheel_mesh" content_type="model/stl" file="/rl_mm/asset/mecanum/meshes/rl_wheel_link.STL" scale="0.6 0.6 0.6"/>
+    <mesh name="rr_wheel_mesh" content_type="model/stl" file="/rl_mm/asset/mecanum/meshes/rr_wheel_link.STL" scale="0.6 0.6 0.6"/>
   </asset>
 
   <worldbody>

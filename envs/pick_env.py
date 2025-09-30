@@ -121,7 +121,7 @@ class SO101Arm(gym.Env):
         if not self.manager.is_any_moving():
             cmd = self.manager.step(action)
             if cmd is not None:
-                self._apply_command(cmd)
+                # self._apply_command(cmd)
                 action_executed = True
         
         # Chạy nhiều physics steps để đẩy nhanh quá trình

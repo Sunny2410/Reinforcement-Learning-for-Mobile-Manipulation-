@@ -133,7 +133,7 @@ class SO101Arm2(gym.Env):
         distance = np.linalg.norm(eef_pos - box_pos)
 
         # Base reward: penalty cho movement
-        movement_penalty = -(self.base_steps * self.base_coeff + self.arm_steps)
+        movement_penalty = -( self.base_coeff + self.base_steps *self.arm_steps)/10
 
         # Reach bonus: nếu eef đủ gần box
         if distance < self.reach_threshold:

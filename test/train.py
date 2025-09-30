@@ -43,7 +43,7 @@ model.save("ppo_her_replaybuffer_so101")
 # -----------------------------
 # 5. Test the trained model
 # -----------------------------
-test_env = gym.make(env_id, render_mode="human")
+test_env = gym.make(env_id, render_mode="rgb_array")
 obs, info = test_env.reset(seed=42)
 
 for _ in range(1000):

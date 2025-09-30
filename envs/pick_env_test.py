@@ -19,7 +19,7 @@ class SO101Arm2(gym.Env):
         "render_fps": 30,
     }
 
-    def __init__(self, render_mode=None, base_coeff=0.1, reach_bonus=10.0, reach_threshold=0.05):
+    def __init__(self, render_mode=None, base_coeff=0.1, reach_bonus=5.0, reach_threshold=0.5):
         super().__init__()
         assert render_mode in (None, "human", "rgb_array")
         self._render_mode = render_mode
@@ -136,13 +136,17 @@ class SO101Arm2(gym.Env):
         movement_penalty = -(self.base_steps * self.base_coeff + self.arm_steps)
 
         # Reach bonus: nếu eef đủ gần box
-        reach_reward = self.reach_bonus if distance < self.reach_threshold else 0.0
+        if distance < self.reach_threshold:
+            # reward tăng dần khi càng gần target
+            reach_reward = self.reach_bonus * (1 - distance / self.reach_threshold)
+        else:
+            reach_reward = 0.0
 
         # Invalid action penalty
         invalid_penalty = -1.0 if invalid_action else 0.0
 
         # Tổng reward
-        total_reward = movement_penalty + reach_reward + invalid_penalty
+        total_reward = movement_penalty + reach_reward + invalid_penalty - distance
 
         # Debug info
         info = {
@@ -245,10 +249,10 @@ class SO101Arm2(gym.Env):
         
         # Get observation
         obs = self._get_obs()
-        
+        print(action_executed)
         # Compute reward với phạt action invalid
         reward, reward_info = self._compute_reward(obs, invalid_action=not action_executed)
-        
+        print("Reward info:", reward_info,reward)
         # Check termination (ví dụ khi reach được object)
         terminated = reward_info['reached']
         

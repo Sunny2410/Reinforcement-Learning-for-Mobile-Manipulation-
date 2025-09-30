@@ -129,7 +129,7 @@ class SO101Arm(gym.Env):
         for _ in range(100):
             cmd = self.manager.update_control_loops()
             if cmd:
-                self._apply_command(cmd)
+                # self._apply_command(cmd)
                 action_executed = True
             
             self.physics.step()

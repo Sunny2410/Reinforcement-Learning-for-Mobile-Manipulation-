@@ -19,6 +19,10 @@ raw_env = test_env.unwrapped
 model_path = "ppo_subproc_so101"  # đường dẫn model
 model = PPO.load(
     model_path,
+    custom_objects={
+        "lr_schedule": lambda _: 3e-4,   # override learning rate schedule
+        "clip_range": lambda _: 0.2      # override clip_range
+    }
 )
 
 # -----------------------------

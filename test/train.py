@@ -1,36 +1,49 @@
-import gymnasium
+import gymnasium as gym
 import rl_mm
+import numpy as np
 from stable_baselines3 import PPO
-from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 
-# 1. Tạo vectorized environment để train nhanh hơn
+# -----------------------------
+# 1. Create environment
+# -----------------------------
 env_id = "rl_mm/SO101-v0"
-num_envs = 4
-env = make_vec_env(env_id, n_envs=num_envs)
+env = gym.make(env_id)
 
-# 2. Tạo model PPO
+# -----------------------------
+# 2. Define PPO model with HER replay buffer
+# -----------------------------
+from stable_baselines3.common.buffers import RolloutBuffer
+from stable_baselines3 import PPO
+
+from stable_baselines3 import PPO
+
 model = PPO(
-    "MlpPolicy",
-    env,
-    verbose=1,
-    learning_rate=3e-4,
-    n_steps=2048,
+    policy="MlpPolicy",
+    env=env,
     batch_size=64,
+    n_steps=2048,
     gamma=0.99,
-    gae_lambda=0.95,
-    ent_coef=0.01,
-    clip_range=0.2
+    learning_rate=3e-4,
+    verbose=1
 )
 
-# 3. Train model
-total_timesteps = 100_000  # chỉnh số timesteps theo nhu cầu
+
+# -----------------------------
+# 3. Train the model
+# -----------------------------
+total_timesteps = 1000000
 model.learn(total_timesteps=total_timesteps)
 
-# 4. Lưu model
-model.save("ppo_so101")
+# -----------------------------
+# 4. Save the model
+# -----------------------------
+model.save("ppo_her_replaybuffer_so101")
 
-# 5. Test model
-test_env = gymnasium.make(env_id, render_mode="human")
+# -----------------------------
+# 5. Test the trained model
+# -----------------------------
+test_env = gym.make(env_id, render_mode="human")
 obs, info = test_env.reset(seed=42)
 
 for _ in range(1000):

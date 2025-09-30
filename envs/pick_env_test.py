@@ -113,30 +113,37 @@ class SO101Arm2(gym.Env):
         
         return obs.astype(np.float64)
 
-    def _compute_reward(self, obs):
+    def _compute_reward(self, obs, invalid_action=False):
         """
-        Reward = -(base_steps * base_coeff + arm_steps) + reach_bonus
-        
+        Reward = -(base_steps * base_coeff + arm_steps) + reach_bonus + invalid_action_penalty
+
         - base_steps: số steps mà base đã di chuyển
         - arm_steps: số steps mà arm đã di chuyển
         - base_coeff: hệ số penalty cho base movement (thường < 1)
         - reach_bonus: bonus khi eef reach được box
+        - invalid_action_penalty: phạt -1 nếu action không thực hiện được
         """
+        import numpy as np
+
         # Extract positions from observation
-        eef_pos = obs[3:6]  # End-effector position
+        eef_pos = obs[3:6]   # End-effector position
         box_pos = obs[10:13]  # Box position
-        
+
         # Tính khoảng cách từ eef đến box
         distance = np.linalg.norm(eef_pos - box_pos)
-        
+
         # Base reward: penalty cho movement
         movement_penalty = -(self.base_steps * self.base_coeff + self.arm_steps)
-        
+
         # Reach bonus: nếu eef đủ gần box
         reach_reward = self.reach_bonus if distance < self.reach_threshold else 0.0
-        
-        total_reward = movement_penalty + reach_reward
-        
+
+        # Invalid action penalty
+        invalid_penalty = -1.0 if invalid_action else 0.0
+
+        # Tổng reward
+        total_reward = movement_penalty + reach_reward + invalid_penalty
+
         # Debug info
         info = {
             'base_steps': self.base_steps,
@@ -144,8 +151,13 @@ class SO101Arm2(gym.Env):
             'distance_to_box': distance,
             'reached': distance < self.reach_threshold,
             'movement_penalty': movement_penalty,
-            'reach_reward': reach_reward
+            'reach_reward': reach_reward,
+            'invalid_action': invalid_action,
+            'invalid_penalty': invalid_penalty
         }
+
+        return total_reward, info
+
         
         return total_reward, info
 
@@ -176,6 +188,11 @@ class SO101Arm2(gym.Env):
         return self._get_obs(), {}
 
     def step(self, action, n_substeps=10):
+        """
+        Step environment:
+        - action: index của action
+        - n_substeps: số bước physics per step (có thể dùng để tăng tốc simulation)
+        """
         # Track loại action để count steps
         action_info = self.action_loader.all_actions()[action]
         print("Selected action:", action_info)
@@ -186,10 +203,15 @@ class SO101Arm2(gym.Env):
 
         print(f"is_base_action: {is_base_action}, is_arm_action: {is_arm_action}")
 
+        # Default: không thực hiện được
+        action_executed = False
+
         # Nếu không có controller nào đang di chuyển, lấy command từ action index
         if not self.manager.is_any_moving():
             cmd = self.manager.step(action)
-            self._apply_command(cmd)
+            if cmd is not None:
+                self._apply_command(cmd)
+                action_executed = True
         
         # Chạy nhiều physics steps để đẩy nhanh quá trình
         substep_count = 0
@@ -197,6 +219,7 @@ class SO101Arm2(gym.Env):
             cmd = self.manager.update_control_loops()
             if cmd:
                 self._apply_command(cmd)
+                action_executed = True
             
             self.physics.step()
             self.physics.forward()
@@ -222,11 +245,11 @@ class SO101Arm2(gym.Env):
         # Get observation
         obs = self._get_obs()
         
-        # Compute reward
-        reward, reward_info = self._compute_reward(obs)
+        # Compute reward với phạt action invalid
+        reward, reward_info = self._compute_reward(obs, invalid_action=not action_executed)
         
-        # Check termination (có thể thêm điều kiện kết thúc)
-        terminated = reward_info['reached']  # Kết thúc khi reach được object
+        # Check termination (ví dụ khi reach được object)
+        terminated = reward_info['reached']
         
         # Merge info
         info = {

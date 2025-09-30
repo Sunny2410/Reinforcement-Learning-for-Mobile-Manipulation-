@@ -153,7 +153,7 @@ class SO101Arm2(gym.Env):
             'base_steps': self.base_steps,
             'arm_steps': self.arm_steps,
             'distance_to_box': distance,
-            'reached': distance < self.reach_threshold,
+            'reached': distance < self.reach_threshold/100,
             'movement_penalty': movement_penalty,
             'reach_reward': reach_reward,
             'invalid_action': invalid_action,

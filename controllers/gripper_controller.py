@@ -131,7 +131,6 @@ class GripperController:
             
         qpos_cmd = curr_qpos + qpos_step
 
-        print(f"Gripper - current: {curr_width:.4f}m, target: {self._target_width:.4f}m, error: {width_error:.4f}m")
 
         return {"gripper_qpos": qpos_cmd}
 

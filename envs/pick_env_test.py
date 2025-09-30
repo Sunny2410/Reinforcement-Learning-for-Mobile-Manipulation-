@@ -187,7 +187,7 @@ class SO101Arm2(gym.Env):
         self.frames = []
         return self._get_obs(), {}
 
-    def step(self, action, n_substeps=10):
+    def step(self, action):
         """
         Step environment:
         - action: index của action
@@ -198,7 +198,7 @@ class SO101Arm2(gym.Env):
         print("Selected action:", action_info)
         action_name = action_info.name.lower()
 
-        is_base_action = 'base' in action_name
+        is_base_action = 'move' or 'turn' in action_name
         is_arm_action = not is_base_action
 
         print(f"is_base_action: {is_base_action}, is_arm_action: {is_arm_action}")
@@ -234,7 +234,10 @@ class SO101Arm2(gym.Env):
             self.base_steps += 1
         if is_arm_action:
             self.arm_steps += 1
-        
+            
+        self.physics.step()
+        self.physics.forward()
+
         # Render sau khi hoàn thành tất cả substeps
         if self._render_mode == "human":
             self._render_frame()
@@ -256,8 +259,8 @@ class SO101Arm2(gym.Env):
             **reward_info,
             'substeps_executed': substep_count
         }
-        
-        return obs, reward, terminated, False, info
+        truncated = False  
+        return obs, reward, terminated, truncated, info
 
     # ---------------- RENDER ----------------
     def render(self) -> np.ndarray:

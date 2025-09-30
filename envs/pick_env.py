@@ -116,36 +116,50 @@ class SO101Arm(gym.Env):
     #     terminated = False
     #     return obs, reward, terminated, False, {}
     
-    def step(self, action, n_substeps=10):
-
+    def step(self, action):
         # Nếu không có controller nào đang di chuyển, lấy command từ action index
         if not self.manager.is_any_moving():
             cmd = self.manager.step(action)
-            self._apply_command(cmd)
+            if cmd is not None:
+                self._apply_command(cmd)
+                action_executed = True
         
         # Chạy nhiều physics steps để đẩy nhanh quá trình
+        substep_count = 0
         for _ in range(100):
             cmd = self.manager.update_control_loops()
             if cmd:
                 self._apply_command(cmd)
+                action_executed = True
             
             self.physics.step()
             self.physics.forward()
+            substep_count += 1
             
             # Nếu đã xong movement, break sớm
             if not self.manager.is_any_moving():
                 break
         
-        # Render sau khi hoàn thành tất cả substeps
+
+        print("Controller moving:", self.manager.is_any_moving())
+        print("Command:", cmd)
+
+        # Chạy một simulation step
+        self.physics.step()
+        self.physics.forward()
+
+        # Render nếu cần
         if self._render_mode == "human":
             self._render_frame()
         elif self._render_mode == "rgb_array":
             frame = self.physics.render(height=480, width=480, camera_id=-1)
             self.frames.append(frame)
-        
+
+        # Lấy observation
         obs = self._get_obs()
         reward = 0
         terminated = False
+
         return obs, reward, terminated, False, {}
 
     # ---------------- RENDER ----------------

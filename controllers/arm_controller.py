@@ -93,10 +93,8 @@ class ArmController:
             #     for j in self.joints_arm
             # ])
             self._qpos_target = new_qpos_target[:-1]  # bỏ phần tử cuối cùng            
-            print("IK solution:", self._qpos_target)
             self._is_moving = True
             self._integral_error[:] = 0.0  # reset integral when new target
-            print(f"New IK target set: {self._qpos_target}")
             return True
         else:
             print("IK failed, target not updated")

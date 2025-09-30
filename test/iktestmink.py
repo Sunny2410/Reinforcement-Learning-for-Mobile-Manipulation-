@@ -3,7 +3,7 @@ import mujoco
 import mink
 
 # 1. Load model
-mj_model = mujoco.MjModel.from_xml_path("/home/sunny24/rl_mm/asset/SO101/so101_new_calib.xml")
+mj_model = mujoco.MjModel.from_xml_path("rl_mm/asset/SO101/so101_new_calib.xml")
 
 # 2. Create Mink configuration
 configuration = mink.Configuration(mj_model)

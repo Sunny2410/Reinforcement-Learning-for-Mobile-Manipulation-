@@ -162,7 +162,7 @@ class SO101Arm2(gym.Env):
         
         # Success thresholds
         reach_threshold = getattr(self, "reach_threshold", 0.5)
-        success_threshold = getattr(self, "success_threshold", 0.05)
+        success_threshold = getattr(self, "success_threshold", 0.0)
         
         # Bonuses
         reach_bonus_scale = getattr(self, "reach_bonus_scale", 1.0)
@@ -211,7 +211,7 @@ class SO101Arm2(gym.Env):
         invalid_term = -invalid_penalty if invalid_action else 0.0
         
         # ----- Total reward -----
-        total_reward = (
+        total_reward = float(
             distance_shaping +
             movement_cost +
             reach_bonus +
@@ -229,7 +229,7 @@ class SO101Arm2(gym.Env):
             "distance_shaping": float(distance_shaping),
             "movement_cost": float(movement_cost),
             "reach_bonus": float(reach_bonus),
-            "success": int(success),
+            "reached": int(success),
             "success_term": float(success_term),
             "invalid_term": float(invalid_term),
             "total_reward": float(total_reward),
@@ -242,30 +242,8 @@ class SO101Arm2(gym.Env):
         
         return total_reward, info
 
-
 # ----- Helper: You need to track actions in your step() method -----
-def step(self, action):
-    """
-    Example of how to track actions for reward calculation.
-    Add this to your environment's step() method.
-    """
-    # Decode action (adjust based on your action space)
-    base_action = action[0]  # e.g., 0=no move, 1=forward, 2=left, etc.
-    arm_action = action[1:]  # joint velocities or positions
-    
-    # Track which systems were used
-    self.base_action_taken = (base_action != 0)  # adjust for your encoding
-    self.arm_action_taken = np.any(np.abs(arm_action) > 1e-6)
-    
-    # ... rest of your step logic ...
-    
-    # Calculate reward
-    reward, info = self._compute_reward(obs, invalid_action)
-    
-    return obs, reward, done, info
 
-
-    
     def _apply_command(self, cmd):
         if "arm_qpos" in cmd:
             ids = [self.physics.model.name2id(j, 'actuator') for j in self.arm_joints]

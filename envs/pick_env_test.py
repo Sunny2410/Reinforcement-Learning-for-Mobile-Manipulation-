@@ -19,7 +19,7 @@ class SO101Arm2(gym.Env):
         "render_fps": 30,
     }
 
-    def __init__(self, render_mode=None, base_coeff=0.1, reach_bonus=5.0, reach_threshold=0.5):
+    def __init__(self, render_mode=None, base_coeff=0.1, reach_bonus=1.0, reach_threshold=0.5):
         super().__init__()
         assert render_mode in (None, "human", "rgb_array")
         self._render_mode = render_mode

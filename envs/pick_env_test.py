@@ -115,136 +115,154 @@ class SO101Arm2(gym.Env):
 
     def _compute_reward(self, obs, invalid_action=False):
         """
-        Improved reward function.
-
-        Key ideas:
-        - separate base (XY) and arm (Z) responsibilities
-        - prefer linear movement penalties (no multiplicative explosion)
-        - use delta-based shaping when possible (uses self.prev_obs if available)
-        - small absolute distance penalty as fallback
-        - smooth reach shaping + a larger success bonus
-        - keep an 'invalid action' penalty
-
-        Returns:
-        total_reward, info_dict
+        Optimized reward function for mobile manipulator.
+        
+        Key improvements:
+        - Consistent distance-based rewards (no conflicting terms)
+        - Per-step movement costs (not cumulative)
+        - Better scaling and normalization
+        - Smoother success transition
         """
 
-        # ----- read positions (same indexing as before) -----
-        eef_pos = np.asarray(obs[3:6], dtype=float)     # end effector
-        box_pos = np.asarray(obs[10:13], dtype=float)   # box
-
-        # componentwise differences
+        # ----- Positions -----
+        eef_pos = np.asarray(obs[3:6], dtype=float)
+        box_pos = np.asarray(obs[10:13], dtype=float)
+        
         diff = eef_pos - box_pos
         dx, dy, dz = diff[0], diff[1], diff[2]
-        abs_xy = float(np.linalg.norm(diff[:2]))
-        abs_dist = float(np.linalg.norm(diff))
-
-        # ----- previous observation (delta-based shaping if available) -----
+        
+        # Current distances
+        dist_xy = float(np.linalg.norm(diff[:2]))
+        dist_3d = float(np.linalg.norm(diff))
+        
+        # ----- Delta-based shaping -----
         prev_obs = getattr(self, "prev_obs", None)
         if prev_obs is not None:
             prev_eef = np.asarray(prev_obs[3:6], dtype=float)
             prev_box = np.asarray(prev_obs[10:13], dtype=float)
             prev_xy = float(np.linalg.norm(prev_eef[:2] - prev_box[:2]))
-            prev_dist = float(np.linalg.norm(prev_eef - prev_box))
-            delta_xy = prev_xy - abs_xy      # positive if we moved closer in XY
-            delta_dist = prev_dist - abs_dist
+            prev_3d = float(np.linalg.norm(prev_eef - prev_box))
+            
+            # Positive if moving closer
+            delta_xy = prev_xy - dist_xy
+            delta_3d = prev_3d - dist_3d
         else:
             delta_xy = 0.0
-            delta_dist = 0.0
-
-        # ----- hyperparameters (use attributes if present, else defaults) -----
-        base_coeff = getattr(self, "base_coeff", 0.1)         # from you
-        reach_bonus = getattr(self, "reach_bonus", 1.0)       # from you
-        reach_threshold = getattr(self, "reach_threshold", 0.5)  # from you
-
-        # tuning weights (defaults chosen to encourage using ARM more than BASE)
-        w_base_step = getattr(self, "w_base_step", 0.05)    # penalty per base step (larger -> discourage base)
-        w_arm_step = getattr(self, "w_arm_step", 0.02)      # penalty per arm step (smaller -> encourage arm)
-        w_delta_xy = getattr(self, "w_delta_xy", 5.0)      # reward for reducing XY distance (delta)
-        w_dz = getattr(self, "w_dz", 2.0)                  # reward for reducing vertical error (delta)
-        abs_dist_weight = getattr(self, "abs_dist_weight", -0.2)  # small absolute distance penalty (fallback)
-        success_bonus = getattr(self, "success_bonus", 5.0)
-        invalid_penalty_val = getattr(self, "invalid_penalty", 1.0)
-
-        # ----- base term -----
+            delta_3d = 0.0
+        
+        # ----- Hyperparameters -----
+        # Distance shaping weights
+        w_delta_xy = getattr(self, "w_delta_xy", 2.0)      # reduced from 5.0
+        w_delta_z = getattr(self, "w_delta_z", 1.0)        # separate Z component
+        w_sparse_dist = getattr(self, "w_sparse_dist", -0.1)  # small absolute penalty
+        
+        # Movement costs (per-step, not cumulative)
+        cost_base_action = getattr(self, "cost_base_action", 0.01)
+        cost_arm_action = getattr(self, "cost_arm_action", 0.005)
+        
+        # Success thresholds
+        reach_threshold = getattr(self, "reach_threshold", 0.5)
+        success_threshold = getattr(self, "success_threshold", 0.05)
+        
+        # Bonuses
+        reach_bonus_scale = getattr(self, "reach_bonus_scale", 1.0)
+        success_bonus = getattr(self, "success_bonus", 10.0)
+        invalid_penalty = getattr(self, "invalid_penalty", 1.0)
+        
+        # ----- 1. Distance-based shaping (main guidance) -----
         if prev_obs is not None:
-            # reward progress in XY (delta-based)
-            base_term = w_delta_xy * float(delta_xy)
-        else:
-            # fallback: small penalty proportional to absolute XY distance
-            base_term = -0.5 * abs_xy
-
-        # ----- arm term (vertical error) -----
-        if prev_obs is not None:
+            # Reward progress in XY (base responsibility)
+            xy_term = w_delta_xy * delta_xy
+            
+            # Reward progress in Z (arm responsibility)
             prev_dz = float(prev_eef[2] - prev_box[2])
-            delta_dz = abs(prev_dz) - abs(dz)   # positive if vertical error reduced
-            arm_term = w_dz * float(delta_dz)
+            delta_dz = abs(prev_dz) - abs(dz)  # positive if closer
+            z_term = w_delta_z * delta_dz
+            
+            distance_shaping = xy_term + z_term
         else:
-            arm_term = -w_dz * abs(dz)
-
-        # ----- movement penalty (linear, not multiplicative) -----
-        # note: self.base_steps and self.arm_steps should be present in your class
-        base_steps = getattr(self, "base_steps", 0)
-        arm_steps = getattr(self, "arm_steps", 0)
-        movement_penalty = -(base_coeff + w_base_step * float(base_steps) + w_arm_step * float(arm_steps))
-
-        # ----- reach shaping + success -----
-        if abs_dist < reach_threshold:
-            reach_shaping = reach_bonus * max(0.0, 1.0 - (abs_dist / reach_threshold))
+            # Fallback: sparse penalty based on current distance
+            distance_shaping = w_sparse_dist * dist_3d
+        
+        # ----- 2. Movement costs (per-step only) -----
+        # Check if actions were taken THIS step (you need to track this)
+        base_action_taken = getattr(self, "base_action_taken", False)
+        arm_action_taken = getattr(self, "arm_action_taken", False)
+        
+        movement_cost = 0.0
+        if base_action_taken:
+            movement_cost -= cost_base_action
+        if arm_action_taken:
+            movement_cost -= cost_arm_action
+        
+        # ----- 3. Reach bonus (smooth transition) -----
+        if dist_3d < reach_threshold:
+            # Quadratic falloff: max bonus at dist=0, zero at reach_threshold
+            reach_progress = 1.0 - (dist_3d / reach_threshold)
+            reach_bonus = reach_bonus_scale * (reach_progress ** 2)
         else:
-            reach_shaping = 0.0
-
-        # success if very close (tighter tolerance)
-        success_tol = max(1e-6, reach_threshold * 0.1)
-        success = 1 if abs_dist < success_tol else 0
-        success_term = success_bonus * success
-
-        # ----- invalid action -----
-        invalid_term = -invalid_penalty_val if invalid_action else 0.0
-
-        # ----- small absolute distance penalty as extra guidance -----
-        abs_dist_penalty = abs_dist_weight * abs_dist
-
-        # ----- combine -----
+            reach_bonus = 0.0
+        
+        # ----- 4. Success bonus -----
+        success = dist_3d < success_threshold
+        success_term = success_bonus if success else 0.0
+        
+        # ----- 5. Invalid action penalty -----
+        invalid_term = -invalid_penalty if invalid_action else 0.0
+        
+        # ----- Total reward -----
         total_reward = (
-            base_term
-            + arm_term
-            + movement_penalty
-            + reach_shaping
-            + success_term
-            + invalid_term
-            + abs_dist_penalty
+            distance_shaping +
+            movement_cost +
+            reach_bonus +
+            success_term +
+            invalid_term
         )
-
-        # ----- info for debugging -----
+        
+        # ----- Info dict -----
         info = {
-            "abs_dist": float(abs_dist),
-            "abs_xy": float(abs_xy),
-            "dz": float(dz),
+            "dist_3d": float(dist_3d),
+            "dist_xy": float(dist_xy),
+            "dist_z": float(abs(dz)),
             "delta_xy": float(delta_xy),
-            "base_term": float(base_term),
-            "arm_term": float(arm_term),
-            "movement_penalty": float(movement_penalty),
-            "reach_shaping": float(reach_shaping),
+            "delta_3d": float(delta_3d),
+            "distance_shaping": float(distance_shaping),
+            "movement_cost": float(movement_cost),
+            "reach_bonus": float(reach_bonus),
             "success": int(success),
             "success_term": float(success_term),
-            "invalid": bool(invalid_action),
             "invalid_term": float(invalid_term),
-            "abs_dist_penalty": float(abs_dist_penalty),
             "total_reward": float(total_reward),
-            "base_steps": int(base_steps),
-            "arm_steps": int(arm_steps),
+            "base_action": bool(base_action_taken),
+            "arm_action": bool(arm_action_taken),
         }
-
-        # ----- update prev_obs for next step (so deltas are available) -----
-        try:
-            # shallow copy should be enough since obs is a numpy array or list
-            self.prev_obs = np.array(obs, dtype=float)
-        except Exception:
-            # fail silently if can't store
-            pass
-
+        
+        # ----- Store current obs for next step -----
+        self.prev_obs = np.array(obs, dtype=float)
+        
         return total_reward, info
+
+
+# ----- Helper: You need to track actions in your step() method -----
+def step(self, action):
+    """
+    Example of how to track actions for reward calculation.
+    Add this to your environment's step() method.
+    """
+    # Decode action (adjust based on your action space)
+    base_action = action[0]  # e.g., 0=no move, 1=forward, 2=left, etc.
+    arm_action = action[1:]  # joint velocities or positions
+    
+    # Track which systems were used
+    self.base_action_taken = (base_action != 0)  # adjust for your encoding
+    self.arm_action_taken = np.any(np.abs(arm_action) > 1e-6)
+    
+    # ... rest of your step logic ...
+    
+    # Calculate reward
+    reward, info = self._compute_reward(obs, invalid_action)
+    
+    return obs, reward, done, info
 
 
     

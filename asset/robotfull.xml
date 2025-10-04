@@ -66,6 +66,9 @@
     <!-- <body name="scene/"> -->
       <!-- <joint type="free"/> -->
       <!-- <freejoint/> -->
+      <body name="camera_mount" pos="0.2 0.0 0.05" euler="-3.14 -1.57 1.57">
+        <camera name="front_cam" pos="0 0 0" quat="1 0 0 0" fovy="75"/>
+      </body>
       <body name="base_link" pos="0 0 0.05" quat="0.000796327 0 0 1">
         <inertial pos="0 0 0" mass="4" diaginertia="0.006567 0.013367 0.0196"/>
         <geom name="base_geom_visual" class="visual" size="0.2 0.14 0.01" type="box" material="grey"/>

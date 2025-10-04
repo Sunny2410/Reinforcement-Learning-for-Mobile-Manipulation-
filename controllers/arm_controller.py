@@ -33,7 +33,7 @@ class ArmController:
         # Control state
         self._qpos_target = None
         self._is_moving = False
-        self._max_step_size = 0.1  # radians
+        self._max_step_size = 1  # radians
         self._integral_error = np.zeros(len(joints_arm))  # integral error
 
     def set_target(self, action_type: str, step: float) -> bool:
@@ -41,7 +41,12 @@ class ArmController:
         # Initialize target deltas
         target_pos = np.array([0.0, 0.0, 0.0])
         target_rpy = np.array([0.0, 0.0, 0.0])
+            # Get current end-effector pose
+        fk = self.kinematics.forward_kinematics()  # <- gọi function
+        curr_pos = fk["eef_world_pos"]
+        curr_quat = fk["eef_world_quat"]
 
+        # print("Current end-effector pose:", curr_pos, curr_quat)
         # Convert step for wrist rotations
         if "WRIST" in action_type:
             step = np.deg2rad(step)
@@ -80,7 +85,7 @@ class ArmController:
         # Assign to class variables
         self._target_pos = target_pos
         self._target_rpy = target_rpy 
-
+        # print(f"Setting arm target: {target_pos}, target rpy: {target_rpy}")
         # Compute IK
         new_qpos_target = self.kinematics.inverse_kinematics(
             target_pos=self._target_pos,
@@ -92,12 +97,14 @@ class ArmController:
             #     new_qpos_target[get_joint_qpos_address(self.kinematics.physics, j)]
             #     for j in self.joints_arm
             # ])
-            self._qpos_target = new_qpos_target[:-1]  # bỏ phần tử cuối cùng            
+            new_qpos_target = np.delete(new_qpos_target, 3)
+
+            self._qpos_target = new_qpos_target  # bỏ phần tử cuối cùng            
             self._is_moving = True
             self._integral_error[:] = 0.0  # reset integral when new target
             return True
         else:
-            print("IK failed, target not updated")
+            # print("IK failed, target not updated")
             self._is_moving = False
             return False
 
@@ -118,6 +125,8 @@ class ArmController:
             return {"arm_qpos": curr_qpos}
 
         curr_qpos = np.array([self.kinematics.physics.named.data.qpos[j] for j in self.joints_arm]).ravel()
+        # print(curr_qpos,self._qpos_target )
+        
         qpos_error = self._qpos_target - curr_qpos
 
         if np.linalg.norm(qpos_error) < self.qpos_tol:

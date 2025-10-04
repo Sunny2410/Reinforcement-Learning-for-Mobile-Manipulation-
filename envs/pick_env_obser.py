@@ -10,8 +10,9 @@ from rl_mm.utils.kinematics import Kinematics
 from rl_mm.robots import MobileSO101
 from rl_mm.props import Primitive
 from rl_mm.arena import StandardArena
+from rl_mm.observations.observation_processor import ObservationProcessor
 
-class SO101Arm2(gym.Env):
+class SO101Arm3(gym.Env):
     """Gymnasium environment with StandardArena, robot, prop, and controller"""
 
     metadata = {
@@ -57,13 +58,27 @@ class SO101Arm2(gym.Env):
 
         # ---------------- OBSERVATION & ACTION SPACE ----------------
         # Observation: [base_pos(3), eef_pos(3), eef_quat(4), box_pos(3)] = 13 dimensions
-        self.observation_space = spaces.Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=(13,),
-            dtype=np.float64
-        )
+        self.observation_space = spaces.Dict({
+            'state': spaces.Box(
+                low=-np.inf,
+                high=np.inf,
+                shape=(13,),
+                dtype=np.float64
+            ),
+            'image': spaces.Box(
+                low=0.0,
+                high=1.0,
+                shape=(224, 224, 3),      # RGB image
+                dtype=np.float32
+            )
+        })
         self.action_space = spaces.Discrete(len(self.action_loader.all_actions()))
+        self.obs_processor = ObservationProcessor(
+                            image_size=(224, 224),      
+                            use_grayscale=False,
+                            stack_frames=1           
+                        )
+        self.camera_name = "scene/front_cam"
 
         # ---------------- REWARD PARAMETERS ----------------
         self.base_coeff = base_coeff  # Hệ số cho base movement
@@ -104,14 +119,47 @@ class SO101Arm2(gym.Env):
         box_pos = self.physics.data.xpos[box_body_id][:3]  # [x, y, z]
         
         # Concatenate tất cả
-        obs = np.concatenate([
+        state = np.concatenate([
             base_pos,      # 3
             eef_pos,       # 3
             eef_quat,      # 4
             box_pos        # 3
         ])
         
-        return obs.astype(np.float64)
+            # 2. ➕ THÊM: Lấy và xử lý ảnh
+        try:
+            camera_id = self.physics.model.name2id(self.camera_name, 'camera')
+            raw_image = self.physics.render(height=480, width=640, camera_id=camera_id)
+            
+            # Preprocessing
+            processed_image = self.obs_processor.process_camera_observation(raw_image)
+            
+        except Exception as e:
+            print(f"Warning: Cannot get camera: {e}")
+            # Fallback: black image
+            processed_image = np.zeros((224, 224, 3), dtype=np.float32)
+        
+        # 3. Return dict
+        return {
+            'state': state,
+            'image': processed_image
+        }
+        # try:
+        #     camera_id = self.physics.model.name2id(self.camera_name, 'camera')
+        #     raw_image = self.physics.render(height=480, width=640, camera_id=camera_id)
+            
+        #     # Bỏ qua preprocessing, in thẳng raw_image
+        #     processed_image = raw_image.astype(np.uint8)  # convert để imageio in ra dễ
+        # except Exception as e:
+        #     print(f"Warning: Cannot get camera: {e}")
+        #     # Fallback: black image
+        #     processed_image = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        # Return dict
+        # return {
+        #     'state': state,
+        #     'image': processed_image
+        # }
 
     def _compute_reward(self, obs, invalid_action=False):
         """
@@ -129,7 +177,8 @@ class SO101Arm2(gym.Env):
         invalid_penalty = getattr(self, "invalid_penalty", 10.0)
         if invalid_action:
             # Store obs for next step
-            self.prev_obs = np.array(obs, dtype=float)
+            self.prev_obs = np.array(obs['state'], dtype=float)
+
             # Return ONLY penalty, no other rewards
             return -invalid_penalty, {
                 "dist_3d": 0.0,
@@ -146,10 +195,10 @@ class SO101Arm2(gym.Env):
                 "total_reward": float(-invalid_penalty),
                 "invalid": 1,
             }
-        
+        state = obs['state']
         # ----- Positions -----
-        eef_pos = np.asarray(obs[3:6], dtype=float)
-        box_pos = np.asarray(obs[10:13], dtype=float)
+        eef_pos = np.asarray(state[3:6], dtype=float)
+        box_pos = np.asarray(state[10:13], dtype=float)
         
         diff = eef_pos - box_pos
         dx, dy, dz = diff[0], diff[1], diff[2]
@@ -271,7 +320,7 @@ class SO101Arm2(gym.Env):
             "z_shaping": float(z_shaping),
             "xy_bonus": float(xy_bonus),
             "reach_bonus": float(reach_bonus),
-            "reached": int(success),
+            "reached": bool(success),
             "success_bonus": float(success_term),
             "movement_cost": float(movement_cost),
             "total_reward": float(total_reward),
@@ -279,7 +328,8 @@ class SO101Arm2(gym.Env):
         }
         
         # ----- Store current obs for next step -----
-        self.prev_obs = np.array(obs, dtype=float)
+        self.prev_obs = np.array(obs['state'], dtype=float)
+
         
         return total_reward, info
 
@@ -343,7 +393,7 @@ class SO101Arm2(gym.Env):
         self.base_steps = 0
         self.arm_steps = 0
         self.kinematics.reset_mink_configuration()
-
+        self.obs_processor.reset_buffer()
         self.frames = []
         return self._get_obs(), {}
 
@@ -355,6 +405,7 @@ class SO101Arm2(gym.Env):
         """
         # Track loại action để count steps
         action_info = self.action_loader.all_actions()[action]
+        print("Selected action:", action_info)
         action_name = action_info.name.lower()
 
         is_base_action = 'move' or 'turn' in action_name

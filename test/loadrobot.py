@@ -2,7 +2,7 @@ import mujoco
 import mujoco.viewer
 
 # Đường dẫn tới file XML
-xml_path = "rl_mm/asset/scene.xml"
+xml_path = "/home/sunny24/rl_mm/asset/SO101/so101_new_calibmink.xml"
 
 # Tải mô hình
 model = mujoco.MjModel.from_xml_path(xml_path)

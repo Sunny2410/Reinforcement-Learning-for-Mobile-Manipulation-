@@ -122,27 +122,20 @@ class SO101Arm(gym.Env):
             cmd = self.manager.step(action)
             if cmd is not None:
                 # self._apply_command(cmd)
-                action_executed = True
-        
+                action_executed = False
         # Chạy nhiều physics steps để đẩy nhanh quá trình
-        substep_count = 0
-        for _ in range(100):
+        for _ in range(1):
             cmd = self.manager.update_control_loops()
             if cmd:
-                # self._apply_command(cmd)
+                self._apply_command(cmd)
                 action_executed = True
-            
             self.physics.step()
             self.physics.forward()
-            substep_count += 1
             
             # Nếu đã xong movement, break sớm
             if not self.manager.is_any_moving():
                 break
-        
-
-        print("Controller moving:", self.manager.is_any_moving())
-        print("Command:", cmd)
+        # Chạy một simulation step
 
         # Chạy một simulation step
         self.physics.step()

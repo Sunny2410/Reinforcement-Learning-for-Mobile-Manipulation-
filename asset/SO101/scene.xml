@@ -1,9 +1,6 @@
 <mujoco model="scene">
-    <compiler angle="radian" assetdir="assets" autolimits="true"/>
-
-    <option timestep="0.004" integrator="implicitfast" gravity="0 0 -9.810"/>
-    <!-- <include file="robotfull.xml" /> -->
-
+    <include file="so101_new_calibG.xml" />
+    <option integrator="implicitfast" solver="CG"/>
     <visual>
         <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
         <rgba haze="0.15 0.25 0.35 1" />
@@ -23,5 +20,11 @@
     <worldbody>
         <light pos="0 0 3.5" dir="0 0 -1" directional="true" />
         <geom name="floor" size="0 0 0.05" pos="0 0 0" type="plane" material="groundplane" />
+        <body name="composite_body">
+            <freejoint />
+              <geom type="box" size=".02 .02 .02" pos="0.3 0 0" rgba=".5 .5 0 1" priority="1" mass="0.03"
+            contype="2" condim="6"/>
+        </body>
+
     </worldbody>
 </mujoco>

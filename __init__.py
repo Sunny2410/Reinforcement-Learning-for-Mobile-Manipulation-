@@ -12,9 +12,7 @@ register(
     id="rl_mm/SO101-v1",
     entry_point="rl_mm.envs:SO101Arm2",
     # Optionally, you can set a maximum number of steps per episode
-<<<<<<< HEAD
     max_episode_steps=100,
-=======
     # max_episode_steps=100,
     # TODO: Uncomment the above line if you want to set a maximum episode step limit
 )
@@ -23,6 +21,5 @@ register(
     entry_point="rl_mm.envs:SO101Arm3",
     # Optionally, you can set a maximum number of steps per episode
     # max_episode_steps=100,
->>>>>>> 3e373ae (Fix kinematics, chaos in enviroment, add visual encoder)
     # TODO: Uncomment the above line if you want to set a maximum episode step limit
 )

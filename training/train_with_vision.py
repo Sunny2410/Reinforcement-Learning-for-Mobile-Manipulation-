@@ -13,7 +13,7 @@ from stable_baselines3.common.monitor import Monitor
 import torch
 
 # Import your environment
-from envs.pick_env import SO101Arm2  # Adjust import path
+from rl_mm.envs import SO101Arm2  # Adjust import path
 
 # Import feature extractors
 from training.feature_extractors import (

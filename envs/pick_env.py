@@ -124,7 +124,7 @@ class SO101Arm(gym.Env):
                 # self._apply_command(cmd)
                 action_executed = False
         # Chạy nhiều physics steps để đẩy nhanh quá trình
-        for _ in range(1):
+        for _ in range(1000):
             cmd = self.manager.update_control_loops()
             if cmd:
                 self._apply_command(cmd)

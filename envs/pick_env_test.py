@@ -10,7 +10,7 @@ from rl_mm.utils.kinematics import Kinematics
 from rl_mm.robots import MobileSO101
 from rl_mm.props import Primitive
 from rl_mm.arena import StandardArena
-
+from rl_mm.randomization import DomainRandomizer
 class SO101Arm2(gym.Env):
     """Gymnasium environment with StandardArena, robot, prop, and controller"""
 
@@ -23,30 +23,68 @@ class SO101Arm2(gym.Env):
         super().__init__()
         assert render_mode in (None, "human", "rgb_array")
         self._render_mode = render_mode
-
-        # ---------------- ARENA ----------------
-        self.arena = StandardArena()
-
-        # Add a free box into arena
-        self.box = Primitive(type="box", size=[0.02,0.02,0.02], rgba=[1,0,0,1])
-        self.arena.attach_free(self.box.mjcf_model, pos=[0.5,0,0.01])
-
-        # Add robot to arena
+        
+        # ---------------- DOMAIN RANDOMIZER ----------------
+        self.randomizer = DomainRandomizer(
+            distance_range=(0.3, 1.0),  # Object distance from robot
+            angle_range=(-30, 30),       # FOV ±30 degrees
+            height_range=(0.01, 0.05)    # Object height
+        )
+        
+        # ---------------- ARENA WITH RANDOMIZATION ----------------
+        self.arena = StandardArena(randomize=True)  # Randomize floor and wall colors
+        
+        # ---------------- RANDOMIZE ROBOT POSE ----------------
+        robot_pos, robot_quat = self.randomizer.randomize_robot_pose(
+            spawn_area=(-1.5, 1.5, -1.5, 1.5)  # Within arena bounds
+        )
+        
+        # Add robot to arena with randomized pose
         self.robot = MobileSO101()
-        self.arena.attach_free(self.robot.mjcf_model, pos=[0,0,0]).add
-        print("Load robot successful:", self.robot)
-
-        # Build physics from arena MJCF
+        self.arena.attach_free(
+            self.robot.mjcf_model, 
+            pos=robot_pos, 
+            quat=robot_quat
+        )
+        print(f"Robot spawned at: pos={robot_pos}, quat={robot_quat}")
+        
+        # ---------------- RANDOMIZE OBJECT POSE ----------------
+        # Spawn object in front of robot within FOV
+        object_pos, object_quat = self.randomizer.randomize_object_pose(
+            robot_pos, 
+            robot_quat
+        )
+        
+        # Create primitive box with randomization
+        self.box = Primitive(
+            type="box",
+            randomize=True  # Randomize size, color, mass
+        )
+        
+        # Attach box with randomized pose
+        self.arena.attach_free(
+            self.box.mjcf_model, 
+            pos=object_pos,
+            quat=object_quat
+        )
+        print(f"Box spawned at: pos={object_pos}, quat={object_quat}")
+        
+        # ---------------- BUILD PHYSICS ----------------
         self.physics = mjcf.Physics.from_mjcf_model(self.arena.mjcf_model)
-
+        
         # ---------------- KINEMATICS & CONTROLLER ----------------
         self.kinematics = Kinematics(self.robot, self.physics)
         self.action_loader = ActionLoader()
-
-        self.wheel_names = ['scene/fl_wheel_joint', 'scene/fr_wheel_joint', 'scene/rl_wheel_joint', 'scene/rr_wheel_joint']
-        self.arm_joints = ['scene/shoulder_pan', 'scene/shoulder_lift', 'scene/elbow_flex', 'scene/wrist_flex', 'scene/wrist_roll']
+        self.wheel_names = [
+            'scene/fl_wheel_joint', 'scene/fr_wheel_joint', 
+            'scene/rl_wheel_joint', 'scene/rr_wheel_joint'
+        ]
+        self.arm_joints = [
+            'scene/shoulder_pan', 'scene/shoulder_lift', 
+            'scene/elbow_flex', 'scene/wrist_flex', 'scene/wrist_roll'
+        ]
         self.gripper_joints = ['scene/gripper']
-
+        
         self.manager = ControllerManager(
             joints_base=self.wheel_names,
             joints_arm=self.arm_joints,
@@ -334,18 +372,59 @@ class SO101Arm2(gym.Env):
     # ---------------- GYM API ----------------
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        self.physics.reset()
-        for _ in range(90):
-            self.physics.step()
-            self.physics.forward()
+
+        # Randomize poses
+        robot_pos, robot_quat = self.randomizer.randomize_robot_pose(
+            spawn_area=(-1.5, 1.5, -1.5, 1.5)
+        )
+        object_pos, object_quat = self.randomizer.randomize_object_pose(
+            robot_pos, robot_quat
+        )
+
+        # Robot
+        try:
+            robot_joint_id = self.physics.model.name2id("scene/", "joint")
+            start = self.physics.model.jnt_qposadr[robot_joint_id]
+            self.physics.data.qpos[start:start+3] = robot_pos
+            self.physics.data.qpos[start+3:start+7] = robot_quat
+        except Exception:
+            print("❌ Cannot find robot joint!")
+
+        # Box
+        try:
+            box_joint_id = self.physics.model.name2id("unnamed_model/", "joint")
+            start = self.physics.model.jnt_qposadr[box_joint_id]
+            self.physics.data.qpos[start:start+3] = object_pos
+            self.physics.data.qpos[start+3:start+7] = object_quat
+        except Exception:
+            print("❌ Cannot find box joint!")
+
+        # Reset velocities
+        self.physics.data.qvel[:] = 0
+        self.physics.data.qacc[:] = 0
+
+        # Forward
+        self.physics.forward()
+
+        # # Reset tracking vars
+        # for _ in range(90):
+        #     self.physics.step()
+        #     self.physics.forward()
 
         # Reset step counters
         self.base_steps = 0
         self.arm_steps = 0
         self.kinematics.reset_mink_configuration()
-
         self.frames = []
-        return self._get_obs(), {}
+
+        observation = self._get_obs()
+        info = {}
+
+        print(f"✅ Robot moved to {robot_pos}, quat={robot_quat}")
+        print(f"✅ Object moved to {object_pos}, quat={object_quat}")
+
+        return observation, info
+
 
     def step(self, action):
         """

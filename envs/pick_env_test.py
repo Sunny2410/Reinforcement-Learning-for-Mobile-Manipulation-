@@ -164,7 +164,7 @@ class SO101Arm2(gym.Env):
         """
         
         # ----- Early return for invalid actions -----
-        invalid_penalty = getattr(self, "invalid_penalty", 10.0)
+        invalid_penalty = getattr(self, "invalid_penalty", 2.0)
         if invalid_action:
             # Store obs for next step
             self.prev_obs = np.array(obs, dtype=float)

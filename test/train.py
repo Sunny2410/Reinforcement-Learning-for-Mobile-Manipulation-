@@ -81,7 +81,7 @@ model = PPO.load(
 # -----------------------------
 # 3. Test loop + save frames
 # -----------------------------
-n_steps = 100
+n_steps = 20
 for step in range(n_steps):
     # Dự đoán action từ model
     action, _states = model.predict(obs, deterministic=True)

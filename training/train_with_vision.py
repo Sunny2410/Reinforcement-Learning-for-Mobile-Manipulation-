@@ -70,7 +70,7 @@ def make_env(rank, seed=0):
         return _init
 
 
-def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, use_subproc: bool = False):
+def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, use_subproc: bool = True):
     """
     ✅ DINOv2 (frozen) + State encoder
     - Multi-env training

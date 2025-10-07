@@ -50,7 +50,7 @@ def make_env(env_id="rl_mm/SO101-v2", seed=0, rank=0):
         apply_mujoco_patches()
         
         # Create environment from env_id
-        env = gym.make(env_id, render_mode="rgb_array")
+        env = gym.make(env_id, render_mode=None)
         
         # Wrap with SeedWrapper for proper seeding
         env = SeedWrapper(env, seed=seed + rank)

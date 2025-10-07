@@ -94,8 +94,8 @@ class GripperController:
         # --- Force feedback ---
         forces = self._get_gripper_forces()
         max_force = forces[0] if len(forces) > 0 else 0.0
-        if max_force > 0.01 or self._no_contact_counter % 10 == 0:
-            print(f"[Gripper] Force: {max_force:.4f}N, Width: {curr_width:.4f}, Target: {self._target_width:.4f}")
+        # if max_force > 0.01 or self._no_contact_counter % 10 == 0:
+        #     print(f"[Gripper] Force: {max_force:.4f}N, Width: {curr_width:.4f}, Target: {self._target_width:.4f}")
 
         # Xác định đang đóng hay mở
         closing = self._target_width < curr_width
@@ -107,14 +107,14 @@ class GripperController:
             self._target_width = curr_width
             self._object_grasped = True
             self._no_contact_counter = 0
-            print(f"[Gripper] Object grasped! Force: {max_force:.2f}N, Width: {curr_width:.4f}")
+            # print(f"[Gripper] Object grasped! Force: {max_force:.2f}N, Width: {curr_width:.4f}")
             return {"gripper_qpos": np.full_like(curr_qpos, curr_width)}
 
         # Nếu đang đóng nhưng không có contact
         if closing:
             self._no_contact_counter += 1
             if self._no_contact_counter >= self.no_contact_timeout and not self._object_grasped:
-                print(f"[Gripper] No object detected, moving to min position")
+                # print(f"[Gripper] No object detected, moving to min position")
                 self._target_width = self._min_width
                 self._no_contact_counter = 0
         else:

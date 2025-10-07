@@ -452,8 +452,8 @@ class SO101Arm3(gym.Env):
         observation = self._get_obs()
         info = {}
 
-        print(f"✅ Robot moved to {robot_pos}, quat={robot_quat}")
-        print(f"✅ Object moved to {object_pos}, quat={object_quat}")
+        # print(f"✅ Robot moved to {robot_pos}, quat={robot_quat}")
+        # print(f"✅ Object moved to {object_pos}, quat={object_quat}")
 
         return observation, info
 

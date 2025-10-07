@@ -1,26 +1,43 @@
 """
-Ví dụ training với Vision Encoders
+Ví dụ training với Vision Encoders - FIXED VERSION
 Tạo file: training/train_with_vision.py
 """
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+import re
+import shutil
+import gymnasium as gym
 from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.monitor import Monitor
 import torch
+import numpy as np
 
 # Import your environment
-from rl_mm.envs import SO101Arm2  # Adjust import path
+from rl_mm.envs import SO101Arm2
 
 # Import feature extractors
-from training.feature_extractors import (
+from .feature_extractors import (
     VisionStateExtractor,
     VisionOnlyExtractor,
     StateOnlyExtractor
 )
+
+
+# ============================================================
+# ENVIRONMENT WRAPPERS
+# ============================================================
+class SeedWrapper(gym.Wrapper):
+    """Wrapper to handle seeding for Gymnasium environments"""
+    def __init__(self, env, seed=None):
+        super().__init__(env)
+        self._seed = seed
+        
+    def reset(self, **kwargs):
+        if self._seed is not None and 'seed' not in kwargs:
+            kwargs['seed'] = self._seed
+        return self.env.reset(**kwargs)
 
 
 # ============================================================
@@ -32,10 +49,21 @@ def make_env(rank, seed=0):
     Dùng cho vectorized training
     """
     def _init():
+        # Apply patches in this subprocess
+        apply_mujoco_patches()
+        
         env = SO101Arm2(render_mode=None)
+        
+        # Wrap with SeedWrapper for proper seeding
+        env = SeedWrapper(env, seed=seed + rank)
+        
+        # Monitor wrapper for logging
         env = Monitor(env, filename=f"./logs/dinov2_multimodal/monitor/env_{rank}")
-        env.seed(seed + rank)
+        
+        # Set random seeds for reproducibility
         np.random.seed(seed + rank)
+        torch.manual_seed(seed + rank)
+        
         return env
     return _init
 
@@ -43,7 +71,7 @@ def make_env(rank, seed=0):
 def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000):
     """
     ✅ DINOv2 (frozen) + State encoder
-    - Multi-env training (SubprocVecEnv for better throughput)
+    - Multi-env training (SubprocVecEnv for parallel execution)
     - With Monitor logging
     - With checkpoint & eval callbacks
     """
@@ -53,10 +81,13 @@ def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000):
 
     # ===== CREATE TRAIN ENV =====
     env_fns = [make_env(rank=i, seed=42) for i in range(num_envs)]
-    env = SubprocVecEnv(env_fns)  # chạy song song thực sự (thay vì DummyVecEnv)
+    # Use SubprocVecEnv for true parallel execution (faster)
+    env = SubprocVecEnv(env_fns)
+    print(f"✓ Created {num_envs} training environments (SubprocVecEnv)")
 
     # ===== CREATE EVAL ENV =====
-    eval_env = DummyVecEnv([make_env(rank=999, seed=123)])  # 1 env để đánh giá định kỳ
+    eval_env = DummyVecEnv([make_env(rank=999, seed=123)])
+    print("✓ Created evaluation environment")
 
     # ===== PPO POLICY CONFIG =====
     policy_kwargs = dict(
@@ -127,12 +158,7 @@ def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000):
 # STRATEGY 2: Vision Only (DINOv2) - Pure Vision-based
 # ============================================================
 def train_vision_only():
-    """
-    Vision-based RL: Chỉ dùng image
-    - Cần nhiều steps hơn (500k-1M)
-    - Harder to train
-    - End-to-end vision control
-    """
+    """Vision-based RL: Chỉ dùng image"""
     print("\n" + "="*70)
     print("TRAINING: Vision Only (DINOv2)")
     print("="*70 + "\n")
@@ -140,7 +166,6 @@ def train_vision_only():
     def make_env():
         from gymnasium import ObservationWrapper
         
-        # Wrapper to extract only image
         class ImageOnlyWrapper(ObservationWrapper):
             def __init__(self, env):
                 super().__init__(env)
@@ -171,7 +196,7 @@ def train_vision_only():
     )
     
     model = PPO(
-        "CnnPolicy",  # Use CnnPolicy for vision-only
+        "CnnPolicy",
         env,
         policy_kwargs=policy_kwargs,
         learning_rate=3e-4,
@@ -188,7 +213,7 @@ def train_vision_only():
     )
     
     model.learn(
-        total_timesteps=500000,  # Need more steps
+        total_timesteps=500000,
         callback=[checkpoint_callback]
     )
     
@@ -200,12 +225,7 @@ def train_vision_only():
 # STRATEGY 3: State Only (Baseline) - No vision
 # ============================================================
 def train_state_only():
-    """
-    Baseline: Chỉ dùng proprioceptive state
-    - Fastest training
-    - Good for simple tasks
-    - No visual understanding
-    """
+    """Baseline: Chỉ dùng proprioceptive state"""
     print("\n" + "="*70)
     print("TRAINING: State Only (Baseline)")
     print("="*70 + "\n")
@@ -230,7 +250,7 @@ def train_state_only():
     eval_env = DummyVecEnv([make_env])
     
     model = PPO(
-        "MlpPolicy",  # Simple MLP
+        "MlpPolicy",
         env,
         learning_rate=3e-4,
         n_steps=2048,
@@ -258,12 +278,7 @@ def train_state_only():
 # STRATEGY 4: Fine-tune (Unfreeze DINOv2)
 # ============================================================
 def train_finetune_dinov2():
-    """
-    Advanced: Fine-tune DINOv2
-    - Train với frozen DINOv2 trước (100k steps)
-    - Unfreeze và fine-tune (100k steps nữa)
-    - Learning rate nhỏ hơn cho vision encoder
-    """
+    """Advanced: Fine-tune DINOv2"""
     print("\n" + "="*70)
     print("TRAINING: Fine-tune DINOv2")
     print("="*70 + "\n")
@@ -284,7 +299,7 @@ def train_finetune_dinov2():
             vision_encoder='dinov2',
             vision_encoder_kwargs={
                 'model_name': 'small',
-                'freeze': True  # FROZEN
+                'freeze': True
             },
             state_hidden_dim=64,
         ),
@@ -307,18 +322,15 @@ def train_finetune_dinov2():
     # PHASE 2: Unfreeze và fine-tune
     print("\n--- PHASE 2: Fine-tune DINOv2 ---")
     
-    # Unfreeze vision encoder
     for param in model.policy.features_extractor.vision_encoder.parameters():
         param.requires_grad = True
     
-    # Set lower learning rate cho vision encoder
     vision_params = list(model.policy.features_extractor.vision_encoder.parameters())
     other_params = [p for p in model.policy.parameters() if p not in vision_params]
     
-    # Recreate optimizer với different learning rates
     model.policy.optimizer = torch.optim.Adam([
-        {'params': vision_params, 'lr': 1e-5},      # Low LR for vision
-        {'params': other_params, 'lr': 3e-4}        # Normal LR for policy
+        {'params': vision_params, 'lr': 1e-5},
+        {'params': other_params, 'lr': 3e-4}
     ])
     
     print("Vision encoder unfrozen, training with differential learning rates...")
@@ -334,11 +346,7 @@ def train_finetune_dinov2():
 # STRATEGY 5: CLIP Encoder (Semantic Understanding)
 # ============================================================
 def train_clip_multimodal():
-    """
-    Sử dụng CLIP thay vì DINOv2
-    - Better for semantic/language grounding
-    - 512 dim features
-    """
+    """Sử dụng CLIP thay vì DINOv2"""
     print("\n" + "="*70)
     print("TRAINING: CLIP + State")
     print("="*70 + "\n")
@@ -394,23 +402,12 @@ def train_clip_multimodal():
 # TESTING TRAINED MODEL
 # ============================================================
 def test_model(model_path, n_episodes=10, render=True):
-    """
-    Test trained model
-    
-    Args:
-        model_path: Path to saved model
-        n_episodes: Number of test episodes
-        render: Render environment
-    """
+    """Test trained model"""
     print(f"\nTesting model: {model_path}")
     
-    # Load model
     model = PPO.load(model_path)
-    
-    # Create environment
     env = SO101Arm2(render_mode='human' if render else None)
     
-    # Test episodes
     episode_rewards = []
     success_count = 0
     
@@ -431,7 +428,6 @@ def test_model(model_path, n_episodes=10, render=True):
         episode_rewards.append(episode_reward)
         print(f"Episode {episode+1}: Reward = {episode_reward:.2f}")
     
-    # Statistics
     print(f"\n{'='*50}")
     print(f"Test Results ({n_episodes} episodes):")
     print(f"  Mean reward: {sum(episode_rewards)/len(episode_rewards):.2f}")
@@ -442,12 +438,266 @@ def test_model(model_path, n_episodes=10, render=True):
 
 
 # ============================================================
+# XML PREPROCESSING - FIX MESH PATHS
+# ============================================================
+def check_stl_files():
+    """Kiểm tra tất cả STL files có tồn tại không"""
+    import glob
+    
+    print("\n" + "="*70)
+    print("CHECKING STL FILES")
+    print("="*70)
+    
+    asset_dir = "rl_mm/asset/SO101"
+    stl_pattern = f"{asset_dir}/**/*.stl"
+    stl_files = glob.glob(stl_pattern, recursive=True)
+    
+    if not stl_files:
+        print(f"❌ No STL files found in {asset_dir}")
+        return False
+    
+    print(f"✓ Found {len(stl_files)} STL files:")
+    all_exist = True
+    for stl in stl_files:
+        abs_path = os.path.abspath(stl)
+        exists = os.path.exists(abs_path)
+        status = "✓" if exists else "❌"
+        print(f"  {status} {stl}")
+        print(f"      → {abs_path}")
+        if not exists:
+            all_exist = False
+    
+    print("="*70 + "\n")
+    return all_exist
+
+
+def preprocess_xml_file():
+    """
+    Sửa XML file in-place: Convert relative mesh paths thành absolute paths
+    Backup file gốc trước khi sửa
+    """
+    xml_path = "rl_mm/asset/SO101/so101_new_calib.xml"
+    
+    # Check if XML exists
+    if not os.path.exists(xml_path):
+        print(f"❌ XML file not found: {xml_path}")
+        return False
+    
+    backup_path = xml_path + ".backup"
+    
+    # Backup original XML nếu chưa có
+    if not os.path.exists(backup_path):
+        try:
+            shutil.copy(xml_path, backup_path)
+            print(f"✓ Backed up XML to {backup_path}")
+        except Exception as e:
+            print(f"⚠️ Cannot backup XML: {e}")
+    
+    # Load XML content
+    try:
+        with open(xml_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except Exception as e:
+        print(f"❌ Cannot read XML file: {e}")
+        return False
+    
+    # Get absolute asset directory
+    asset_dir = os.path.dirname(os.path.abspath(xml_path))
+    print(f"📁 Asset directory: {asset_dir}")
+    
+    # Check what paths are in XML before fixing
+    print("\n🔍 Current mesh paths in XML:")
+    original_paths = re.findall(r'file="([^"]+\.stl)"', content)
+    for path in original_paths[:3]:  # Show first 3
+        print(f"  - {path}")
+    
+    # Fix mesh file paths
+    def fix_mesh_path(match):
+        rel_path = match.group(1)
+        
+        # If already absolute, skip
+        if os.path.isabs(rel_path):
+            if os.path.exists(rel_path):
+                return match.group(0)
+            else:
+                print(f"  ⚠️ Absolute path not found: {rel_path}")
+        
+        # Convert to absolute
+        abs_path = os.path.abspath(os.path.join(asset_dir, rel_path))
+        
+        # Check if file exists
+        if os.path.exists(abs_path):
+            print(f"  ✓ {os.path.basename(abs_path)}")
+            return f'file="{abs_path}"'
+        else:
+            print(f"  ❌ NOT FOUND: {abs_path}")
+            print(f"     Original: {rel_path}")
+            return match.group(0)  # Keep original if not found
+    
+    print("\n🔧 Fixing mesh paths...")
+    content = re.sub(r'file="([^"]+\.stl)"', fix_mesh_path, content)
+    
+    # Fix texture paths if any
+    content = re.sub(r'file="([^"]+\.png)"', fix_mesh_path, content)
+    
+    # Save fixed XML
+    try:
+        with open(xml_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print("✅ XML file preprocessed successfully!")
+        
+        # Verify
+        print("\n✓ Verification - paths after fixing:")
+        fixed_paths = re.findall(r'file="([^"]+\.stl)"', content)
+        for path in fixed_paths[:3]:
+            print(f"  - {path}")
+        
+        return True
+    except Exception as e:
+        print(f"❌ Cannot write XML file: {e}")
+        return False
+
+
+def restore_xml_backup():
+    """Khôi phục XML từ backup"""
+    xml_path = "rl_mm/asset/SO101/so101_new_calib.xml"
+    backup_path = xml_path + ".backup"
+    
+    if os.path.exists(backup_path):
+        shutil.copy(backup_path, xml_path)
+        print("✓ Restored XML from backup")
+    else:
+        print("⚠️ No backup found")
+
+
+# ============================================================
+# MUJOCO/DM_CONTROL PATCHES
+# ============================================================
+def apply_mujoco_patches():
+    """
+    Apply comprehensive patches for MuJoCo and dm_control
+    """
+    import builtins
+    import mujoco
+    from dm_control import mjcf
+    from dm_control.utils import io as dm_io
+    
+    XML_ABS_PATH = os.path.abspath("rl_mm/asset/SO101/so101_new_calib.xml")
+    ASSET_DIR = os.path.dirname(XML_ABS_PATH)
+    
+    print("=" * 70)
+    print("APPLYING MUJOCO PATCHES")
+    print("=" * 70)
+    print(f"XML path: {XML_ABS_PATH}")
+    print(f"Asset dir: {ASSET_DIR}")
+    
+    # -------------------------
+    # 1. Patch builtins.open
+    # -------------------------
+    _original_open = builtins.open
+    
+    def open_patched(file, *args, **kwargs):
+        if isinstance(file, str):
+            # Fix malformed paths like "/rl_mm/..."
+            if file.startswith("/rl_mm/"):
+                file = file[1:]  # Remove leading "/"
+            
+            # Convert relative paths to absolute
+            if not os.path.isabs(file) and "rl_mm" in file:
+                file = os.path.abspath(file)
+        
+        return _original_open(file, *args, **kwargs)
+    
+    builtins.open = open_patched
+    
+    # -------------------------
+    # 2. Patch mujoco.MjModel.from_xml_path
+    # -------------------------
+    _old_from_xml = mujoco.MjModel.from_xml_path
+    
+    def from_xml_path_patched(path, *args, **kwargs):
+        if "so101_new_calib.xml" in str(path):
+            path = XML_ABS_PATH
+        return _old_from_xml(path, *args, **kwargs)
+    
+    mujoco.MjModel.from_xml_path = from_xml_path_patched
+    
+    # -------------------------
+    # 3. Patch dm_control's mjcf.from_path
+    # -------------------------
+    _original_mjcf_from_path = mjcf.from_path
+    
+    def mjcf_from_path_patched(path, *args, **kwargs):
+        if "so101_new_calib.xml" in str(path):
+            path = XML_ABS_PATH
+        return _original_mjcf_from_path(path, *args, **kwargs)
+    
+    mjcf.from_path = mjcf_from_path_patched
+    
+    # -------------------------
+    # 4. Patch dm_control.GetResource
+    # -------------------------
+    _original_getresource = dm_io.GetResource
+    
+    def getresource_patched(path, *args, **kwargs):
+        if isinstance(path, str):
+            if path.startswith("/rl_mm/"):
+                path = path[1:]
+            if not os.path.isabs(path) and "rl_mm" in path:
+                path = os.path.abspath(path)
+        return _original_getresource(path, *args, **kwargs)
+    
+    dm_io.GetResource = getresource_patched
+    
+    print("✅ Patches applied successfully!")
+    print("=" * 70 + "\n")
+
+
+# ============================================================
 # MAIN SCRIPT
 # ============================================================
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description="Train multimodal RL models with various strategies.")
+    # =========================
+    # STEP 1: Check STL files
+    # =========================
+    print("\n" + "="*70)
+    print("STEP 1: CHECKING STL FILES")
+    print("="*70 + "\n")
+    
+    if not check_stl_files():
+        print("\n❌ STL files check failed!")
+        print("Please ensure all STL files exist in rl_mm/asset/SO101/assets/")
+        sys.exit(1)
+    
+    # =========================
+    # STEP 2: Preprocess XML
+    # =========================
+    print("\n" + "="*70)
+    print("STEP 2: XML PREPROCESSING")
+    print("="*70 + "\n")
+    
+    success = preprocess_xml_file()
+    if not success:
+        print("\n❌ XML preprocessing failed! Check file paths.")
+        sys.exit(1)
+    
+    # =========================
+    # STEP 3: Apply Patches
+    # =========================
+    print("\n" + "="*70)
+    print("STEP 3: APPLYING PATCHES")
+    print("="*70 + "\n")
+    
+    apply_mujoco_patches()
+    
+    # =========================
+    # STEP 4: Parse Arguments
+    # =========================
+    parser = argparse.ArgumentParser(
+        description="Train multimodal RL models with various strategies."
+    )
     parser.add_argument(
         '--strategy', type=str, default='multimodal',
         choices=['multimodal', 'vision_only', 'state_only', 'finetune', 'clip'],
@@ -465,17 +715,38 @@ if __name__ == "__main__":
         '--test', type=str, default=None,
         help='Path to model for testing (if provided, skips training)'
     )
+    parser.add_argument(
+        '--restore', action='store_true',
+        help='Restore XML from backup and exit'
+    )
     
     args = parser.parse_args()
-
+    
+    # =========================
+    # RESTORE MODE
+    # =========================
+    if args.restore:
+        restore_xml_backup()
+        sys.exit(0)
+    
+    # =========================
+    # TEST MODE
+    # =========================
     if args.test:
-        # Run in test mode
         test_model(args.test, n_episodes=10, render=True)
-    else:
-        # Training mode
-        print(f"\nSelected strategy: {args.strategy}")
-        print(f"Number of envs: {args.num_envs} | Total timesteps: {args.total_timesteps:,}\n")
-
+        sys.exit(0)
+    
+    # =========================
+    # TRAINING MODE
+    # =========================
+    print("\n" + "="*70)
+    print("STEP 4: TRAINING")
+    print("="*70)
+    print(f"\nSelected strategy: {args.strategy}")
+    print(f"Number of envs: {args.num_envs}")
+    print(f"Total timesteps: {args.total_timesteps:,}\n")
+    
+    try:
         # Strategy mapping
         if args.strategy == 'multimodal':
             model = train_multimodal_dinov2(
@@ -493,11 +764,25 @@ if __name__ == "__main__":
         else:
             raise ValueError(f"❌ Unknown strategy: {args.strategy}")
         
-        print("\n✓ Training finished!")
+        print("\n" + "="*70)
+        print("✓ TRAINING COMPLETED!")
+        print("="*70)
         print(f"Model saved to ./models/{args.strategy}/")
-        print(f"\nTo test:")
+        print(f"\nTo test your model:")
         print(f"python train_with_vision.py --test ./models/{args.strategy}/final_model")
-
+        print(f"\nTo restore original XML:")
+        print(f"python train_with_vision.py --restore")
+        
+    except KeyboardInterrupt:
+        print("\n\n⚠️ Training interrupted by user")
+    except Exception as e:
+        print(f"\n❌ Training failed with error: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Optionally restore XML after training
+        # restore_xml_backup()
+        pass
 
 
 # ============================================================
@@ -507,21 +792,30 @@ if __name__ == "__main__":
 # 1. Train với DINOv2 + State (RECOMMENDED)
 python train_with_vision.py --strategy multimodal
 
-# 2. Train vision-only
+# 2. Train với 8 parallel envs và 500k steps
+python train_with_vision.py --strategy multimodal --num_envs 8 --total_timesteps 500000
+
+# 3. Train vision-only
 python train_with_vision.py --strategy vision_only
 
-# 3. Train baseline (state only)
+# 4. Train baseline (state only)
 python train_with_vision.py --strategy state_only
 
-# 4. Fine-tune DINOv2
+# 5. Fine-tune DINOv2
 python train_with_vision.py --strategy finetune
 
-# 5. Train với CLIP
+# 6. Train với CLIP
 python train_with_vision.py --strategy clip
 
-# 6. Test trained model
+# 7. Test trained model
 python train_with_vision.py --test ./models/multimodal/final_model
 
-# 7. Monitor training với TensorBoard
+# 8. Restore original XML from backup
+python train_with_vision.py --restore
+
+# 9. Monitor training với TensorBoard
 tensorboard --logdir ./logs/
+
+# 10. Debug: Check if XML was fixed correctly
+cat rl_mm/asset/SO101/so101_new_calib.xml | grep "file="
 """

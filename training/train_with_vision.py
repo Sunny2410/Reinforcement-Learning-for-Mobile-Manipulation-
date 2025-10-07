@@ -447,33 +447,57 @@ def test_model(model_path, n_episodes=10, render=True):
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--strategy', type=str, default='multimodal',
-                       choices=['multimodal', 'vision_only', 'state_only', 'finetune', 'clip'],
-                       help='Training strategy')
-    parser.add_argument('--test', type=str, default=None,
-                       help='Path to model for testing')
-    args = parser.parse_args()
+    parser = argparse.ArgumentParser(description="Train multimodal RL models with various strategies.")
+    parser.add_argument(
+        '--strategy', type=str, default='multimodal',
+        choices=['multimodal', 'vision_only', 'state_only', 'finetune', 'clip'],
+        help='Training strategy to use'
+    )
+    parser.add_argument(
+        '--num_envs', type=int, default=4,
+        help='Number of parallel training environments (default: 4)'
+    )
+    parser.add_argument(
+        '--total_timesteps', type=int, default=200_000,
+        help='Total number of training timesteps (default: 200000)'
+    )
+    parser.add_argument(
+        '--test', type=str, default=None,
+        help='Path to model for testing (if provided, skips training)'
+    )
     
+    args = parser.parse_args()
+
     if args.test:
-        # Test mode
+        # Run in test mode
         test_model(args.test, n_episodes=10, render=True)
     else:
         # Training mode
-        strategies = {
-            'multimodal': train_multimodal_dinov2,
-            'vision_only': train_vision_only,
-            'state_only': train_state_only,
-            'finetune': train_finetune_dinov2,
-            'clip': train_clip_multimodal
-        }
-        
         print(f"\nSelected strategy: {args.strategy}")
-        model = strategies[args.strategy]()
+        print(f"Number of envs: {args.num_envs} | Total timesteps: {args.total_timesteps:,}\n")
+
+        # Strategy mapping
+        if args.strategy == 'multimodal':
+            model = train_multimodal_dinov2(
+                num_envs=args.num_envs,
+                total_timesteps=args.total_timesteps
+            )
+        elif args.strategy == 'clip':
+            model = train_clip_multimodal()
+        elif args.strategy == 'vision_only':
+            model = train_vision_only()
+        elif args.strategy == 'state_only':
+            model = train_state_only()
+        elif args.strategy == 'finetune':
+            model = train_finetune_dinov2()
+        else:
+            raise ValueError(f"❌ Unknown strategy: {args.strategy}")
         
         print("\n✓ Training finished!")
         print(f"Model saved to ./models/{args.strategy}/")
-        print(f"\nTo test: python train_with_vision.py --test ./models/{args.strategy}/final_model")
+        print(f"\nTo test:")
+        print(f"python train_with_vision.py --test ./models/{args.strategy}/final_model")
+
 
 
 # ============================================================

@@ -44,7 +44,7 @@ class SeedWrapper(gym.Wrapper):
 # STRATEGY 1: Vision + State (DINOv2) - RECOMMENDED
 # ============================================================
 
-def make_env(env_id="SO101-v2", seed=0, rank=0):
+def make_env(env_id="rl_mm/SO101-v2", seed=0, rank=0):
     def _init():
         # Apply patches in this subprocess
         apply_mujoco_patches()

@@ -66,7 +66,7 @@ def make_env(env_id="rl_mm/SO101-v2", seed=0, rank=0):
     return _init
 
 
-def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, use_subproc: bool = False):
+def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, use_subproc: bool = True):
     """
     ✅ DINOv2 (frozen) + State encoder
     - Multi-env training
@@ -124,7 +124,7 @@ def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, u
         env=env,
         policy_kwargs=policy_kwargs,
         learning_rate=3e-4,
-        n_steps=2048,
+        n_steps=512,
         batch_size=64,
         n_epochs=10,
         gamma=0.99,

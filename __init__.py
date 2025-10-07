@@ -20,6 +20,6 @@ register(
     id="rl_mm/SO101-v2",
     entry_point="rl_mm.envs:SO101Arm3",
     # Optionally, you can set a maximum number of steps per episode
-    # max_episode_steps=100,
+    max_episode_steps=100,
     # TODO: Uncomment the above line if you want to set a maximum episode step limit
 )

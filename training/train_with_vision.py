@@ -322,60 +322,82 @@ def train_finetune_dinov2():
 # ============================================================
 # STRATEGY 5: CLIP Encoder (Semantic Understanding)
 # ============================================================
-def train_clip_multimodal():
+
+def train_clip_multimodal(n_envs=4, total_steps=1_000_000):
     """
-    Sử dụng CLIP thay vì DINOv2
-    - Better for semantic/language grounding
-    - 512 dim features
+    Train PPO với CLIP + state input, chạy song song nhiều envs
     """
     print("\n" + "="*70)
-    print("TRAINING: CLIP + State")
+    print(f"TRAINING: CLIP + State  |  {n_envs} parallel environments")
     print("="*70 + "\n")
-    
-    def make_env():
-        env = SO101Arm2(render_mode=None)
-        env = Monitor(env)
-        return env
-    
-    env = DummyVecEnv([make_env for _ in range(4)])
-    
+
+    # --- 1. Factory function tạo từng env ---
+    def make_env(rank):
+        def _init():
+            env = SO101Arm2(render_mode=None)
+            env = Monitor(env, filename=f"./logs/env_{rank}")
+            return env
+        return _init
+
+    # --- 2. Vectorized env ---
+    # SubprocVecEnv -> mỗi env chạy ở process riêng
+    # Nếu debug hoặc trên Windows, có thể fallback sang DummyVecEnv
+    try:
+        env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
+        print(f"✅ Using SubprocVecEnv with {n_envs} processes")
+    except Exception as e:
+        print(f"⚠️ SubprocVecEnv failed ({e}), falling back to DummyVecEnv")
+        env = DummyVecEnv([make_env(i) for i in range(n_envs)])
+
+    # --- 3. Policy config ---
     policy_kwargs = dict(
         features_extractor_class=VisionStateExtractor,
         features_extractor_kwargs=dict(
             features_dim=256,
-            vision_encoder='clip',
+            vision_encoder='dinov2',           # 👈 đổi lại thành DINOv2
             vision_encoder_kwargs={
-                'model_name': 'ViT-B/32',
-                'freeze': True
+                'model_name': 'small',          # hoặc 'base', 'large', 'giant'
+                'freeze': True                  # freeze trọng số (chỉ trích đặc trưng)
             },
             state_hidden_dim=64,
         ),
         net_arch=[256, 256],
     )
-    
+
+    # --- 4. PPO model ---
     model = PPO(
         "MultiInputPolicy",
         env,
         policy_kwargs=policy_kwargs,
         learning_rate=3e-4,
-        n_steps=2048,
-        batch_size=64,
+        n_steps=512,              # mỗi env thu thập 512 step → 512*n_envs total/batch
+        batch_size=128,
+        n_epochs=4,
+        gamma=0.99,
+        gae_lambda=0.95,
+        clip_range=0.2,
+        ent_coef=0.001,
         verbose=1,
         tensorboard_log="./logs/clip_multimodal/",
+        device="auto",
     )
-    
+
+    # --- 5. Callback lưu checkpoint ---
     checkpoint_callback = CheckpointCallback(
-        save_freq=10000,
+        save_freq=25_000 // n_envs,       # lưu sau mỗi ~25k steps tổng
         save_path="./models/clip_multimodal/",
         name_prefix="ppo_clip"
     )
-    
+
+    # --- 6. Training ---
     model.learn(
-        total_timesteps=200000,
+        total_timesteps=total_steps,
         callback=[checkpoint_callback]
     )
-    
+
     model.save("./models/clip_multimodal/final_model")
+    env.close()
+    print("✅ Training done, model saved at ./models/clip_multimodal/final_model")
     return model
 
 

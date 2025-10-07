@@ -48,24 +48,26 @@ def make_env(rank, seed=0):
     Tạo 1 environment instance với Monitor (ghi reward, ep_len, v.v)
     Dùng cho vectorized training
     """
-    def _init():
-        # Apply patches in this subprocess
-        apply_mujoco_patches()
-        
-        env = SO101Arm3(render_mode=None)
-        
-        # Wrap with SeedWrapper for proper seeding
-        env = SeedWrapper(env, seed=seed + rank)
-        
-        # Monitor wrapper for logging
-        env = Monitor(env, filename=f"./logs/dinov2_multimodal/monitor/env_{rank}")
-        
-        # Set random seeds for reproducibility
-        np.random.seed(seed + rank)
-        torch.manual_seed(seed + rank)
-        
-        return env
-    return _init
+    def make_env(env_id="SO101-v2", seed=0, rank=0):
+        def _init():
+            # Apply patches in this subprocess
+            apply_mujoco_patches()
+            
+            # Create environment from env_id
+            env = gym.make(env_id, render_mode="rgb_array")
+            
+            # Wrap with SeedWrapper for proper seeding
+            env = SeedWrapper(env, seed=seed + rank)
+            
+            # Monitor wrapper for logging
+            env = Monitor(env, filename=f"./logs/dinov2_multimodal/monitor/env_{rank}")
+            
+            # Set random seeds for reproducibility
+            np.random.seed(seed + rank)
+            torch.manual_seed(seed + rank)
+            
+            return env
+        return _init
 
 
 def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, use_subproc: bool = False):

@@ -1,11 +1,24 @@
 import gymnasium as gym
 import numpy as np
-from stable_baselines3 import PPO
 from PIL import Image  # để lưu ảnh
-
-
 import os, builtins, mujoco
 from dm_control.utils import io as dm_io
+import argparse
+
+# =========================
+# Stable Baselines imports
+# =========================
+from stable_baselines3 import PPO, DQN
+
+# =========================
+# Argument parser
+# =========================
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_type", type=str, default="ppo", choices=["ppo", "dqn"],
+                    help="Which RL model to load: 'ppo' or 'dqn'")
+parser.add_argument("--model_path", type=str, default="ppo_subproc_so101",
+                    help="Path to the trained model")
+args = parser.parse_args()
 
 # =========================
 # Absolute path fix cho XML
@@ -52,38 +65,39 @@ def from_xml_path_patched(path, *args, **kwargs):
     return _old_from_xml(path, *args, **kwargs)
 
 mujoco.MjModel.from_xml_path = from_xml_path_patched
-
 print("✅ Patched: open() + dm_control.GetResource + mujoco.MjModel.from_xml_path")
-
 
 # -----------------------------
 # 1. Setup environment
 # -----------------------------
 env_id = "rl_mm/SO101-v1"
-test_env = gym.make(env_id, render_mode="rgb_array")  # <-- đổi từ human sang rgb_array
+test_env = gym.make(env_id, render_mode="rgb_array")
 obs, info = test_env.reset(seed=42)
-
-# Lấy env gốc nếu cần truy cập manager / robot
 raw_env = test_env.unwrapped
 
 # -----------------------------
-# 2. Load trained PPO model
+# 2. Load trained model (PPO / DQN)
 # -----------------------------
-model_path = "ppo_subproc_so101"  # đường dẫn model
-model = PPO.load(
-    model_path,
-    custom_objects={
-        "lr_schedule": lambda _: 3e-4,   # override learning rate schedule
-        "clip_range": lambda _: 0.2      # override clip_range
-    }
-)
+if args.model_type == "ppo":
+    model = PPO.load(
+        args.model_path,
+        custom_objects={
+            "lr_schedule": lambda _: 3e-4,
+            "clip_range": lambda _: 0.2
+        }
+    )
+elif args.model_type == "dqn":
+    model = DQN.load(args.model_path)
+else:
+    raise ValueError(f"Unknown model type: {args.model_type}")
+
+print(f"✅ Loaded {args.model_type.upper()} model from {args.model_path}")
 
 # -----------------------------
 # 3. Test loop + save frames
 # -----------------------------
 n_steps = 20
 for step in range(n_steps):
-    # Dự đoán action từ model
     action, _states = model.predict(obs, deterministic=True)
     
     # Convert action array -> int nếu cần
@@ -92,15 +106,12 @@ for step in range(n_steps):
 
     print(f"Step {step} - Action chosen:", action)
 
-    # Thực hiện action
     obs, reward, terminated, truncated, info = test_env.step(action)
-
-    # Render ra array (RGB) và lưu ảnh
-    frame = test_env.render()  # trả về numpy array
+    frame = test_env.render()
     img = Image.fromarray(frame)
-    img.save(f"frames/frame_{step:04d}.png")  # lưu theo thứ tự
+    os.makedirs("frames", exist_ok=True)
+    img.save(f"frames/frame_{step:04d}.png")
 
-    # Reset nếu episode kết thúc
     if terminated or truncated:
         obs, info = test_env.reset()
 

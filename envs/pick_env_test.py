@@ -26,7 +26,7 @@ class SO101Arm2(gym.Env):
         
         # ---------------- DOMAIN RANDOMIZER ----------------
         self.randomizer = DomainRandomizer(
-            distance_range=(0.3, 1.0),  # Object distance from robot
+            distance_range=(0.3, 0.8),  # Object distance from robot
             angle_range=(-30, 30),       # FOV ±30 degrees
             height_range=(0.01, 0.05)    # Object height
         )
@@ -36,7 +36,7 @@ class SO101Arm2(gym.Env):
         
         # ---------------- RANDOMIZE ROBOT POSE ----------------
         robot_pos, robot_quat = self.randomizer.randomize_robot_pose(
-            spawn_area=(-1.5, 1.5, -1.5, 1.5)  # Within arena bounds
+            spawn_area=(-1., 1., -1., 1.)  # Within arena bounds
         )
         
         # Add robot to arena with randomized pose

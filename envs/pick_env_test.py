@@ -32,7 +32,7 @@ class SO101Arm2(gym.Env):
         )
         
         # ---------------- ARENA WITH RANDOMIZATION ----------------
-        self.arena = StandardArena(randomize=True)  # Randomize floor and wall colors
+        self.arena = StandardArena()  # Randomize floor and wall colors
         
         # ---------------- RANDOMIZE ROBOT POSE ----------------
         robot_pos, robot_quat = self.randomizer.randomize_robot_pose(
@@ -56,10 +56,7 @@ class SO101Arm2(gym.Env):
         )
         
         # Create primitive box with randomization
-        self.box = Primitive(
-            type="box",
-            randomize=True  # Randomize size, color, mass
-        )
+        self.box = Primitive(type="box", size=[0.02,0.02,0.02], rgba=[1,0,0,1],mass=0.03,randomize=False)
         
         # Attach box with randomized pose
         self.arena.attach_free(

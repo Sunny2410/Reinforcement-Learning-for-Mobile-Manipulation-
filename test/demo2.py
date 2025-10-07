@@ -56,7 +56,7 @@ print("✅ Patched: open() + dm_control.GetResource + mujoco.MjModel.from_xml_pa
 # -------------------------
 # 4. Run Environment
 # -------------------------
-env = gymnasium.make("rl_mm/SO101-v2", render_mode="human")
+env = gymnasium.make("rl_mm/SO101-v2", render_mode="rgb_array")
 obs, info = env.reset(seed=42)
 print("▶️ Env reset lần đầu")
 
@@ -89,6 +89,25 @@ try:
 
         # Step
         obs, reward, terminated, truncated, info = env.step(idx)
+        # === In obs chi tiết ===
+        if isinstance(obs, dict):
+            print("🔍 Obs keys:", list(obs.keys()))
+            for k, v in obs.items():
+                if isinstance(v, np.ndarray):
+                    print(f"\n📊 {k}: shape={v.shape}, dtype={v.dtype}")
+                    # Nếu mảng nhỏ thì in hết, nếu lớn thì in 1 vài phần tử
+                    flat = v.flatten()
+                    if flat.size <= 50:
+                        print(v)
+                    else:
+                        print(f"  min={v.min():.3f}, max={v.max():.3f}, mean={v.mean():.3f}")
+                        print("  sample:", flat[:10], "...")
+                else:
+                    print(f"\n📄 {k}: {v}")
+        else:
+            print("🔍 Obs:", obs)
+
+
         step_count += 1
         print(f"Step {step_count} | Action {idx} | Reward {reward:.3f} | Terminated={terminated} | Truncated={truncated}")
 

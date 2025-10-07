@@ -79,72 +79,81 @@ if __name__ == "__main__":
     arena.attach_free(robot.mjcf_model, pos=[0, 0, 0.05])
 
     # 3️⃣ Thêm hộp có thể di chuyển (freejoint)
-    box = Primitive(type="box", size=[0.1, 0.1, 0.1], rgba=[1, 0, 0, 1])
+    box = Primitive(type="box", size=[0.02, 0.02, 0.02], rgba=[1, 0, 0, 1],mass=0.03)
     arena.attach_free(box.mjcf_model, pos=[0.4, 0, 0.05])
 
     # 4️⃣ Build physics
     physics = mjcf.Physics.from_mjcf_model(arena.mjcf_model)
 
-    # 5️⃣ Di chuyển robot và box trong runtime
-    # -------------------------------------------------
-    # Lấy số lượng qpos hiện tại
-    nq = physics.model.nq
-    print(f"\n🔧 Tổng số qpos: {nq}")
+    # # 5️⃣ Di chuyển robot và box trong runtime
+    # # -------------------------------------------------
+    # # Lấy số lượng qpos hiện tại
+    # nq = physics.model.nq
+    # print(f"\n🔧 Tổng số qpos: {nq}")
 
-    # Mỗi freejoint có 7 giá trị: [x, y, z, qw, qx, qy, qz]
-    # Giả sử thứ tự là: robot (7 giá trị đầu) → box (7 giá trị tiếp)
-    # Robot: di chuyển tới [0.6, -0.2, 0.05] và quay nhẹ quanh z
-    robot_pos = [0.6, -0.2, 0.05]
-    robot_quat = [0.9239, 0, 0, 0.3827]  # quay 45 độ quanh z
+    # # Mỗi freejoint có 7 giá trị: [x, y, z, qw, qx, qy, qz]
+    # # Giả sử thứ tự là: robot (7 giá trị đầu) → box (7 giá trị tiếp)
+    # # Robot: di chuyển tới [0.6, -0.2, 0.05] và quay nhẹ quanh z
+    # robot_pos = [0.6, -0.2, 0.05]
+    # robot_quat = [0.9239, 0, 0, 0.3827]  # quay 45 độ quanh z
 
-    # Box: di chuyển tới [0.2, 0.3, 0.05]
-    box_pos = [0.2, 0.3, 0.05]
-    box_quat = [1, 0, 0, 0]
+    # # Box: di chuyển tới [0.2, 0.3, 0.05]
+    # box_pos = [0.2, 0.3, 0.05]
+    # box_quat = [1, 0, 0, 0]
 
-    # Gán lại qpos
-    physics.data.qpos[0:3] = robot_pos
-    physics.data.qpos[3:7] = robot_quat
-    physics.data.qpos[7:10] = box_pos
-    physics.data.qpos[10:14] = box_quat
-    physics.forward()
-    # -------------------------------------------------
+    # # Gán lại qpos
+    # physics.data.qpos[0:3] = robot_pos
+    # physics.data.qpos[3:7] = robot_quat
+    # physics.data.qpos[7:10] = box_pos
+    # physics.data.qpos[10:14] = box_quat
+    # physics.forward()
+    # # -------------------------------------------------
 
-    # 6️⃣ Render ảnh
-    img = physics.render(height=480, width=480, camera_id=-1)
+    # # 6️⃣ Render ảnh
+    # img = physics.render(height=480, width=480, camera_id=-1)
 
-    # 7️⃣ Lưu ảnh
-    save_path = "rl_mm/test/env.png"
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    imageio.imwrite(save_path, img)
-    print(f"✅ Environment image saved at: {save_path}")
+    # # 7️⃣ Lưu ảnh
+    # save_path = "rl_mm/test/env.png"
+    # os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    # imageio.imwrite(save_path, img)
+    # print(f"✅ Environment image saved at: {save_path}")
 
-    # 8️⃣ Lấy danh sách body và vị trí
-    body_ids = range(physics.model.nbody)
-    body_names = [physics.model.id2name(i, "body") for i in body_ids]
-    body_positions = physics.data.xpos
-    body_quats = physics.data.xquat
+    # # 8️⃣ Lấy danh sách body và vị trí
+    # body_ids = range(physics.model.nbody)
+    # body_names = [physics.model.id2name(i, "body") for i in body_ids]
+    # body_positions = physics.data.xpos
+    # body_quats = physics.data.xquat
 
-    print("\n📦 Danh sách các body trong mô hình:")
-    for i, name in enumerate(body_names):
-        pos = np.round(body_positions[i], 3)
-        quat = np.round(body_quats[i], 3)
-        print(f"  {i:02d}. {name:25s} → pos={pos}, quat={quat}")
+    # print("\n📦 Danh sách các body trong mô hình:")
+    # for i, name in enumerate(body_names):
+    #     pos = np.round(body_positions[i], 3)
+    #     quat = np.round(body_quats[i], 3)
+    #     print(f"  {i:02d}. {name:25s} → pos={pos}, quat={quat}")
 
-    # 9️⃣ In riêng body của robot
-    print("\n🤖 Các body thuộc robot test_robot:")
-    for i, name in enumerate(body_names):
-        if name and name.startswith("test_robot"):
-            pos = np.round(body_positions[i], 3)
-            print(f"  {i:02d}. {name:25s} → pos={pos}")
+    # # 9️⃣ In riêng body của robot
+    # print("\n🤖 Các body thuộc robot test_robot:")
+    # for i, name in enumerate(body_names):
+    #     if name and name.startswith("test_robot"):
+    #         pos = np.round(body_positions[i], 3)
+    #         print(f"  {i:02d}. {name:25s} → pos={pos}")
 
-    # 🔟 Kiểm tra robot có joint hay không
-    try:
-        root_body_id = physics.model.name2id("test_robot/", "body")
-        has_joint = np.any(physics.model.body_jntnum[root_body_id] > 0)
-    except Exception:
-        has_joint = False
+    # # 🔟 Kiểm tra robot có joint hay không
+    # try:
+    #     root_body_id = physics.model.name2id("test_robot/", "body")
+    #     has_joint = np.any(physics.model.body_jntnum[root_body_id] > 0)
+    # except Exception:
+    #     has_joint = False
 
-    if has_joint:
-        print("✅ Robot có joint → có thể di chuyển trong runtime.")
-    else:
-        print("❌ Robot không có joint → cố định, không di chuyển được.")
+    # if has_joint:
+    #     print("✅ Robot có joint → có thể di chuyển trong runtime.")
+    # else:
+    #     print("❌ Robot không có joint → cố định, không di chuyển được.")
+    xml_text = arena.mjcf_model.to_xml_string()
+    print("=== MJCF XML ===")
+    print(xml_text)
+
+    # Lưu ra file nếu muốn
+    with open("arena_dump.xml", "w") as f:
+        f.write(xml_text)
+    print("✅ XML dumped to arena_dump.xml")
+    

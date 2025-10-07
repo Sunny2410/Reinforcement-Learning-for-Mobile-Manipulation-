@@ -961,3 +961,18 @@ def euler_to_quat(roll: float, pitch: float, yaw: float) -> np.ndarray:
     qz = cr*cp*sy - sr*sp*cy
 
     return np.array([qx, qy, qz, qw])
+
+def quat_rotate_vector(q, v):
+    """
+    Rotate vector v by quaternion q.
+    q: [w, x, y, z] or [x, y, z, w] (tùy convention)
+    v: vector 3d
+    """
+    # convert quaternion to rotation matrix
+    w, x, y, z = q  # nếu q=[w, x, y, z]
+    R = np.array([
+        [1 - 2*(y**2 + z**2),     2*(x*y - z*w),       2*(x*z + y*w)],
+        [2*(x*y + z*w),       1 - 2*(x**2 + z**2),     2*(y*z - x*w)],
+        [2*(x*z - y*w),           2*(y*z + x*w),   1 - 2*(x**2 + y**2)]
+    ])
+    return R @ v

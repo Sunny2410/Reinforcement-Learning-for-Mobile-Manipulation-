@@ -11,6 +11,7 @@ from rl_mm.robots import MobileSO101
 from rl_mm.props import Primitive
 from rl_mm.arena import StandardArena
 from rl_mm.observations.observation_processor import ObservationProcessor
+from rl_mm.randomization import DomainRandomizer
 
 class SO101Arm3(gym.Env):
     """Gymnasium environment with StandardArena, robot, prop, and controller"""
@@ -24,30 +25,65 @@ class SO101Arm3(gym.Env):
         super().__init__()
         assert render_mode in (None, "human", "rgb_array")
         self._render_mode = render_mode
-
-        # ---------------- ARENA ----------------
-        self.arena = StandardArena()
-
-        # Add a free box into arena
-        self.box = Primitive(type="box", size=[0.02,0.02,0.02], rgba=[1,0,0,1])
-        self.arena.attach_free(self.box.mjcf_model, pos=[0.5,0,0.01])
-
-        # Add robot to arena
+        
+        # ---------------- DOMAIN RANDOMIZER ----------------
+        self.randomizer = DomainRandomizer(
+            distance_range=(0.3, 1.0),  # Object distance from robot
+            angle_range=(-30, 30),       # FOV ±30 degrees
+            height_range=(0.01, 0.05)    # Object height
+        )
+        
+        # ---------------- ARENA WITH RANDOMIZATION ----------------
+        self.arena = StandardArena()  # Randomize floor and wall colors
+        
+        # ---------------- RANDOMIZE ROBOT POSE ----------------
+        robot_pos, robot_quat = self.randomizer.randomize_robot_pose(
+            spawn_area=(-1.5, 1.5, -1.5, 1.5)  # Within arena bounds
+        )
+        
+        # Add robot to arena with randomized pose
         self.robot = MobileSO101()
-        self.arena.attach_free(self.robot.mjcf_model, pos=[0,0,0]).add
-        print("Load robot successful:", self.robot)
-
-        # Build physics from arena MJCF
+        self.arena.attach_free(
+            self.robot.mjcf_model, 
+            pos=robot_pos, 
+            quat=robot_quat
+        )
+        print(f"Robot spawned at: pos={robot_pos}, quat={robot_quat}")
+        
+        # ---------------- RANDOMIZE OBJECT POSE ----------------
+        # Spawn object in front of robot within FOV
+        object_pos, object_quat = self.randomizer.randomize_object_pose(
+            robot_pos, 
+            robot_quat
+        )
+        
+        # Create primitive box with randomization
+        self.box = Primitive(type="box", size=[0.02,0.02,0.02], rgba=[1,0,0,1],mass=0.03,randomize=False)
+        
+        # Attach box with randomized pose
+        self.arena.attach_free(
+            self.box.mjcf_model, 
+            pos=object_pos,
+            quat=object_quat
+        )
+        print(f"Box spawned at: pos={object_pos}, quat={object_quat}")
+        
+        # ---------------- BUILD PHYSICS ----------------
         self.physics = mjcf.Physics.from_mjcf_model(self.arena.mjcf_model)
-
+        
         # ---------------- KINEMATICS & CONTROLLER ----------------
         self.kinematics = Kinematics(self.robot, self.physics)
         self.action_loader = ActionLoader()
-
-        self.wheel_names = ['scene/fl_wheel_joint', 'scene/fr_wheel_joint', 'scene/rl_wheel_joint', 'scene/rr_wheel_joint']
-        self.arm_joints = ['scene/shoulder_pan', 'scene/shoulder_lift', 'scene/elbow_flex', 'scene/wrist_flex', 'scene/wrist_roll']
+        self.wheel_names = [
+            'scene/fl_wheel_joint', 'scene/fr_wheel_joint', 
+            'scene/rl_wheel_joint', 'scene/rr_wheel_joint'
+        ]
+        self.arm_joints = [
+            'scene/shoulder_pan', 'scene/shoulder_lift', 
+            'scene/elbow_flex', 'scene/wrist_flex', 'scene/wrist_roll'
+        ]
         self.gripper_joints = ['scene/gripper']
-
+        
         self.manager = ControllerManager(
             joints_base=self.wheel_names,
             joints_arm=self.arm_joints,
@@ -62,7 +98,7 @@ class SO101Arm3(gym.Env):
             'state': spaces.Box(
                 low=-np.inf,
                 high=np.inf,
-                shape=(13,),
+                shape=(7,),
                 dtype=np.float64
             ),
             'image': spaces.Box(
@@ -95,91 +131,65 @@ class SO101Arm3(gym.Env):
         self._step_start = None
         self.frames = []
 
-    # ---------------- HELPER ----------------
     def _get_obs(self):
         """
-        Observation bao gồm:
-        - base_pos: vị trí base robot (x, y, z) - 3D
-        - eef_pos: vị trí end-effector (x, y, z) - 3D  
-        - eef_quat: quaternion của end-effector (w, x, y, z) - 4D
-        - box_pos: vị trí của box (x, y, z) - 3D
-        Tổng: 13 dimensions
+        Observation với proper normalization.
+        State: 7D normalized vector
+        Image: (224, 224, 3) processed camera
         """
-        # 1. Vị trí base robot (lấy từ freejoint hoặc body position)
         fk = self.kinematics.forward_kinematics()
-        eef_pos = fk["eef_world_pos"]
-        eef_quat = fk["eef_world_quat"]
+        
         base_pos = fk["base_world_pos"]
-
-        # eef_pos: [x, y, z]
-        # eef_quat: [w, x, y, z] or [x, y, z, w] - cần check format
+        eef_pos = fk["eef_world_pos"]
+        eef_quat = fk["eef_world_quat"]  # (w, x, y, z)
         
-        # 3. Vị trí của box
-        box_body_id = self.physics.model.name2id('unnamed_model/', 'body')
-        box_pos = self.physics.data.xpos[box_body_id][:3]  # [x, y, z]
+        # Relative position
+        eef_pos_relative = eef_pos - base_pos
+        self.max_eef_reach = 2
+        # Normalize position to [-1, 1]
+        eef_pos_normalized = np.clip(
+            eef_pos_relative / self.max_eef_reach,
+            -1.0, 1.0
+        )
         
-        # Concatenate tất cả
+        # Ensure quaternion is normalized
+        quat_norm = np.linalg.norm(eef_quat)
+        if quat_norm > 1e-6:
+            eef_quat = eef_quat / quat_norm
+        
         state = np.concatenate([
-            base_pos,      # 3
-            eef_pos,       # 3
-            eef_quat,      # 4
-            box_pos        # 3
-        ])
+            eef_pos_normalized,  # 3D ∈ [-1, 1]
+            eef_quat,            # 4D ∈ [-1, 1] (unit quaternion)
+        ]).astype(np.float32)
         
-            # 2. ➕ THÊM: Lấy và xử lý ảnh
+        # Camera
         try:
             camera_id = self.physics.model.name2id(self.camera_name, 'camera')
             raw_image = self.physics.render(height=480, width=640, camera_id=camera_id)
-            
-            # Preprocessing
             processed_image = self.obs_processor.process_camera_observation(raw_image)
-            
         except Exception as e:
             print(f"Warning: Cannot get camera: {e}")
-            # Fallback: black image
             processed_image = np.zeros((224, 224, 3), dtype=np.float32)
         
-        # 3. Return dict
         return {
             'state': state,
             'image': processed_image
         }
-        # try:
-        #     camera_id = self.physics.model.name2id(self.camera_name, 'camera')
-        #     raw_image = self.physics.render(height=480, width=640, camera_id=camera_id)
-            
-        #     # Bỏ qua preprocessing, in thẳng raw_image
-        #     processed_image = raw_image.astype(np.uint8)  # convert để imageio in ra dễ
-        # except Exception as e:
-        #     print(f"Warning: Cannot get camera: {e}")
-        #     # Fallback: black image
-        #     processed_image = np.zeros((480, 640, 3), dtype=np.uint8)
-
-        # Return dict
-        # return {
-        #     'state': state,
-        #     'image': processed_image
-        # }
-
+    
     def _compute_reward(self, obs, invalid_action=False):
         """
-        Strict reward function: Invalid action = lose ALL rewards this step.
-        Forces model to learn robot constraints.
+        Reward function với PRIVILEGED box position.
         
-        Design principles:
-        - Invalid action → return large penalty only, no other rewards
-        - Separate XY (base) and Z (arm) progress tracking
-        - Smooth shaping rewards for gradual approach
-        - Large success bonus for completion
+        Note: Box position KHÔNG có trong obs['state'], nhưng dùng cho reward.
+        Đây là asymmetric information (teacher-student paradigm).
         """
         
         # ----- Early return for invalid actions -----
         invalid_penalty = getattr(self, "invalid_penalty", 10.0)
         if invalid_action:
-            # Store obs for next step
             self.prev_obs = np.array(obs['state'], dtype=float)
-
-            # Return ONLY penalty, no other rewards
+            self.prev_box_pos = self._get_box_pos()  # Store for next step
+            
             return -invalid_penalty, {
                 "dist_3d": 0.0,
                 "dist_xy": 0.0,
@@ -188,6 +198,7 @@ class SO101Arm3(gym.Env):
                 "delta_z": 0.0,
                 "xy_shaping": 0.0,
                 "z_shaping": 0.0,
+                "xy_bonus": 0.0,
                 "reach_bonus": 0.0,
                 "reached": 0,
                 "success_bonus": 0.0,
@@ -195,10 +206,22 @@ class SO101Arm3(gym.Env):
                 "total_reward": float(-invalid_penalty),
                 "invalid": 1,
             }
+        
         state = obs['state']
+        
         # ----- Positions -----
-        eef_pos = np.asarray(state[3:6], dtype=float)
-        box_pos = np.asarray(state[10:13], dtype=float)
+        # State format: [eef_pos_relative (3), eef_quat (4)] = 7D
+        # eef_pos_relative = state[0:3]
+        # eef_quat = state[3:7]
+        
+        # ✨ Get absolute positions for reward calculation
+        fk = self.kinematics.forward_kinematics()
+        base_pos = fk["base_world_pos"]
+        eef_pos_relative = np.asarray(state[0:3], dtype=float)
+        eef_pos = base_pos + eef_pos_relative  # Convert back to world frame
+        
+        # ✨ Get box position (PRIVILEGED - không có trong obs!)
+        box_pos = self._get_box_pos()
         
         diff = eef_pos - box_pos
         dx, dy, dz = diff[0], diff[1], diff[2]
@@ -210,13 +233,17 @@ class SO101Arm3(gym.Env):
         
         # ----- Delta-based shaping -----
         prev_obs = getattr(self, "prev_obs", None)
-        if prev_obs is not None:
-            prev_eef = np.asarray(prev_obs[3:6], dtype=float)
-            prev_box = np.asarray(prev_obs[10:13], dtype=float)
-            prev_xy = float(np.linalg.norm((prev_eef - prev_box)[:2]))
-            prev_z = float(abs(prev_eef[2] - prev_box[2]))
+        prev_box_pos = getattr(self, "prev_box_pos", None)
+        
+        if prev_obs is not None and prev_box_pos is not None:
+            prev_eef_relative = np.asarray(prev_obs[0:3], dtype=float)
+            prev_base_pos = getattr(self, "prev_base_pos", base_pos)
+            prev_eef = prev_base_pos + prev_eef_relative
             
-            # Positive if moving closer
+            prev_diff = prev_eef - prev_box_pos
+            prev_xy = float(np.linalg.norm(prev_diff[:2]))
+            prev_z = float(abs(prev_diff[2]))
+            
             delta_xy = prev_xy - dist_xy
             delta_z = prev_z - dist_z
         else:
@@ -224,40 +251,30 @@ class SO101Arm3(gym.Env):
             delta_z = 0.0
         
         # ----- Hyperparameters -----
-        # Shaping weights (separate XY and Z)
-        w_xy = getattr(self, "w_xy", 5.0)           # Base movement
-        w_z = getattr(self, "w_z", 3.0)             # Arm movement
-        
-        # Movement costs
+        w_xy = getattr(self, "w_xy", 5.0)
+        w_z = getattr(self, "w_z", 3.0)
         cost_base = getattr(self, "cost_base", 0.02)
         cost_arm = getattr(self, "cost_arm", 0.01)
-        
-        # Thresholds
         xy_close_threshold = getattr(self, "xy_close_threshold", 0.3)
         reach_threshold = getattr(self, "reach_threshold", 0.15)
         success_threshold = getattr(self, "success_threshold", 0.08)
-        
-        # Bonuses
         xy_close_bonus = getattr(self, "xy_close_bonus", 2.0)
         reach_bonus_val = getattr(self, "reach_bonus_val", 5.0)
         success_bonus = getattr(self, "success_bonus", 20.0)
         
-        # ----- 1. XY Shaping (Base responsibility) -----
+        # ----- 1. XY Shaping -----
         if prev_obs is not None and delta_xy != 0.0:
-            # Exponential scaling: reward more when closer
-            scale = np.exp(-dist_xy)  # Higher when dist_xy small
+            scale = np.exp(-dist_xy)
             xy_shaping = w_xy * delta_xy * (1.0 + scale)
         else:
             xy_shaping = 0.0
         
-        # ----- 2. Z Shaping (Arm responsibility) -----
+        # ----- 2. Z Shaping -----
         if prev_obs is not None and delta_z != 0.0:
-            # Only reward Z progress when XY is reasonably close
-            if dist_xy < 0.5:  # Within 50cm XY
+            if dist_xy < 0.5:
                 scale = np.exp(-dist_z)
                 z_shaping = w_z * delta_z * (1.0 + scale)
             else:
-                # Penalize Z movement when XY is far (wasting effort)
                 z_shaping = -0.5 * abs(delta_z)
         else:
             z_shaping = 0.0
@@ -268,27 +285,23 @@ class SO101Arm3(gym.Env):
         
         movement_cost = 0.0
         if base_action_taken:
-            # Extra penalty if base moves when already close in XY
             if dist_xy < xy_close_threshold:
-                movement_cost -= cost_base * 3.0  # 3x penalty
+                movement_cost -= cost_base * 3.0
             else:
                 movement_cost -= cost_base
         
         if arm_action_taken:
-            # Extra penalty if arm moves when XY is far
             if dist_xy > 0.5:
                 movement_cost -= cost_arm * 2.0
             else:
                 movement_cost -= cost_arm
         
         # ----- 4. Milestone bonuses -----
-        # XY close bonus (base reached target XY)
         if dist_xy < xy_close_threshold:
             xy_bonus = xy_close_bonus * (1.0 - dist_xy / xy_close_threshold)
         else:
             xy_bonus = 0.0
         
-        # Reach bonus (within reach distance)
         if dist_3d < reach_threshold:
             reach_progress = 1.0 - (dist_3d / reach_threshold)
             reach_bonus = reach_bonus_val * (reach_progress ** 2)
@@ -327,11 +340,18 @@ class SO101Arm3(gym.Env):
             "invalid": 0,
         }
         
-        # ----- Store current obs for next step -----
+        # ----- Store for next step -----
         self.prev_obs = np.array(obs['state'], dtype=float)
-
+        self.prev_box_pos = box_pos
+        self.prev_base_pos = base_pos
         
         return total_reward, info
+
+
+    def _get_box_pos(self):
+        """Helper to get box position (privileged info)."""
+        box_body_id = self.physics.model.name2id('unnamed_model/', 'body')
+        return np.asarray(self.physics.data.xpos[box_body_id][:3], dtype=float)
 
 
 # ----- Recommended hyperparameters -----
@@ -384,18 +404,59 @@ class SO101Arm3(gym.Env):
     # ---------------- GYM API ----------------
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        self.physics.reset()
-        for _ in range(90):
-            self.physics.step()
-            self.physics.forward()
+
+        # Randomize poses
+        robot_pos, robot_quat = self.randomizer.randomize_robot_pose(
+            spawn_area=(-1.5, 1.5, -1.5, 1.5)
+        )
+        object_pos, object_quat = self.randomizer.randomize_object_pose(
+            robot_pos, robot_quat
+        )
+
+        # Robot
+        try:
+            robot_joint_id = self.physics.model.name2id("scene/", "joint")
+            start = self.physics.model.jnt_qposadr[robot_joint_id]
+            self.physics.data.qpos[start:start+3] = robot_pos
+            self.physics.data.qpos[start+3:start+7] = robot_quat
+        except Exception:
+            print("❌ Cannot find robot joint!")
+
+        # Box
+        try:
+            box_joint_id = self.physics.model.name2id("unnamed_model/", "joint")
+            start = self.physics.model.jnt_qposadr[box_joint_id]
+            self.physics.data.qpos[start:start+3] = object_pos
+            self.physics.data.qpos[start+3:start+7] = object_quat
+        except Exception:
+            print("❌ Cannot find box joint!")
+
+        # Reset velocities
+        self.physics.data.qvel[:] = 0
+        self.physics.data.qacc[:] = 0
+
+        # Forward
+        self.physics.forward()
+
+        # # Reset tracking vars
+        # for _ in range(90):
+        #     self.physics.step()
+        #     self.physics.forward()
 
         # Reset step counters
         self.base_steps = 0
         self.arm_steps = 0
         self.kinematics.reset_mink_configuration()
-        self.obs_processor.reset_buffer()
         self.frames = []
-        return self._get_obs(), {}
+
+        observation = self._get_obs()
+        info = {}
+
+        print(f"✅ Robot moved to {robot_pos}, quat={robot_quat}")
+        print(f"✅ Object moved to {object_pos}, quat={object_quat}")
+
+        return observation, info
+
 
     def step(self, action):
         """

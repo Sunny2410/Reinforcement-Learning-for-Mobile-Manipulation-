@@ -28,7 +28,7 @@ class SO101Arm(gym.Env):
         self.arena = StandardArena()
 
         # Add a free box into arena
-        self.box = Primitive(type="box", size=[0.02,0.02,0.02], rgba=[1,0,0,1])
+        self.box = Primitive(type="box", size=[0.02,0.02,0.02], rgba=[1,0,0,1],mass=0.03,randomize=False)
         self.arena.attach_free(self.box.mjcf_model, pos=[0.5,0,0.01])
 
         # Add robot to arena

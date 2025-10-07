@@ -506,12 +506,12 @@ class SO101Arm3(gym.Env):
         self.physics.step()
         self.physics.forward()
 
-        # Render sau khi hoàn thành tất cả substeps
-        if self._render_mode == "human":
-            self._render_frame()
-        elif self._render_mode == "rgb_array":
-            frame = self.physics.render(height=480, width=480, camera_id=-1)
-            self.frames.append(frame)
+        # # Render sau khi hoàn thành tất cả substeps
+        # if self._render_mode == "human":
+        #     self._render_frame()
+        # elif self._render_mode == "rgb_array":
+        #     frame = self.physics.render(height=480, width=480, camera_id=-1)
+        #     self.frames.append(frame)
         
         # Get observation
         obs = self._get_obs()

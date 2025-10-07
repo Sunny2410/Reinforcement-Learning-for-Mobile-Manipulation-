@@ -23,7 +23,10 @@ from .feature_extractors import (
     VisionOnlyExtractor,
     StateOnlyExtractor
 )
+os.environ['MUJOCO_GL'] = 'osmesa'  # Software rendering, chậm hơn nhưng luôn work
 
+# Hoặc disable render hoàn toàn
+os.environ['MUJOCO_GL'] = 'disable'
 
 # ============================================================
 # ENVIRONMENT WRAPPERS

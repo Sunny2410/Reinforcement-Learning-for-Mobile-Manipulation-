@@ -13,30 +13,33 @@ class DINOv2Encoder(nn.Module):
     DINOv2 Vision Encoder - Facebook's self-supervised vision model
     
     Variants:
-    - dinov2_vits14: Small (21M params, 384 dim)
-    - dinov2_vitb14: Base (86M params, 768 dim)
-    - dinov2_vitl14: Large (300M params, 1024 dim)
-    - dinov2_vitg14: Giant (1.1B params, 1536 dim)
+        - small: dinov2_vits14 (21M params, 384 dim)
+        - base: dinov2_vitb14 (86M params, 768 dim)
+        - large: dinov2_vitl14 (300M params, 1024 dim)
+        - giant: dinov2_vitg14 (1.1B params, 1536 dim)
     """
-    
+
     def __init__(
         self,
         model_name: Literal['small', 'base', 'large', 'giant'] = 'small',
         freeze: bool = True,
-        use_cls_token: bool = True
+        use_cls_token: bool = True,
+        device: Optional[torch.device] = None
     ):
         """
         Args:
             model_name: Kích thước model ('small', 'base', 'large', 'giant')
             freeze: Có freeze weights không (recommend: True)
             use_cls_token: Dùng [CLS] token hay average pooling
+            device: 'cuda' hoặc 'cpu'
         """
         super().__init__()
-        
+
+        self.device = device if device is not None else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_name = model_name
         self.freeze = freeze
         self.use_cls_token = use_cls_token
-        
+
         # Load pre-trained DINOv2
         model_mapping = {
             'small': 'dinov2_vits14',
@@ -44,7 +47,6 @@ class DINOv2Encoder(nn.Module):
             'large': 'dinov2_vitl14',
             'giant': 'dinov2_vitg14'
         }
-        
         try:
             self.encoder = torch.hub.load(
                 'facebookresearch/dinov2',
@@ -53,59 +55,61 @@ class DINOv2Encoder(nn.Module):
             print(f"✓ Loaded DINOv2-{model_name} successfully")
         except Exception as e:
             raise RuntimeError(f"Failed to load DINOv2: {e}")
-        
-        # Feature dimensions
+
+        # Feature dimension
         self.feature_dim = {
             'small': 384,
             'base': 768,
             'large': 1024,
             'giant': 1536
         }[model_name]
-        
-        # Freeze weights if needed
+
+        # Freeze
         if freeze:
             for param in self.encoder.parameters():
                 param.requires_grad = False
             self.encoder.eval()
             print(f"✓ DINOv2 weights frozen")
-        
+
         # Input normalization (ImageNet stats)
         self.register_buffer(
             'mean',
-            torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+            torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(self.device)
         )
         self.register_buffer(
             'std',
-            torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
+            torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(self.device)
         )
-    
-    def forward(self, x):
+
+        # Move encoder to device
+        self.encoder.to(self.device)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x: Image tensor [batch, height, width, channels] hoặc [batch, channels, height, width]
-               Values trong [0, 1]
-        
+            x: Image tensor [batch, H, W, C] hoặc [batch, C, H, W], values trong [0,1]
         Returns:
             features: [batch, feature_dim]
         """
-        # Ensure NCHW format
+        x = x.to(self.device)
+
+        # Convert NHWC -> NCHW
         if x.dim() == 4 and x.shape[-1] in [1, 3]:
-            x = x.permute(0, 3, 1, 2)  # NHWC -> NCHW
-        
-        # Normalize với ImageNet stats
+            x = x.permute(0, 3, 1, 2)
+
+        # Normalize
         x = (x - self.mean) / self.std
-        
-        # Extract features
+
+        # Forward
         if self.freeze:
             with torch.no_grad():
                 features = self.encoder(x)
         else:
             features = self.encoder(x)
-        
+
         return features
-    
-    def get_feature_dim(self):
-        """Return output feature dimension"""
+
+    def get_feature_dim(self) -> int:
         return self.feature_dim
 
 

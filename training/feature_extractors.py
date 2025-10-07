@@ -20,8 +20,7 @@ class VisionStateExtractor(BaseFeaturesExtractor):
     Multi-modal Feature Extractor:
     - Image → Vision Encoder (DINOv2/CLIP/ResNet/CNN)
     - State → Small MLP
-    - Concat → Final features
-    
+    - Concat → Fusion network → Final features
     Dùng với MultiInputPolicy của SB3
     """
     
@@ -32,110 +31,78 @@ class VisionStateExtractor(BaseFeaturesExtractor):
         vision_encoder: str = 'dinov2',
         vision_encoder_kwargs: dict = None,
         state_hidden_dim: int = 64,
-        normalize_state: bool = True
+        normalize_state: bool = True,
+        device: torch.device = None
     ):
         """
         Args:
             observation_space: Dict space với 'image' và 'state'
-            features_dim: Output feature dimension
+            features_dim: Kích thước feature đầu ra
             vision_encoder: 'dinov2', 'clip', 'resnet', 'cnn'
-            vision_encoder_kwargs: Dict arguments cho vision encoder
-            state_hidden_dim: Hidden dim cho state MLP
-            normalize_state: Có normalize state không
+            vision_encoder_kwargs: dict các kwargs cho vision encoder
+            state_hidden_dim: hidden dim cho state MLP
+            normalize_state: True/False có normalize state
+            device: torch.device, mặc định là 'cuda' nếu có
         """
-        # Call parent constructor
         super().__init__(observation_space, features_dim)
         
-        # Validate observation space
-        assert isinstance(observation_space, spaces.Dict), "Must use Dict observation space"
-        assert 'image' in observation_space.spaces, "Must have 'image' key"
-        assert 'state' in observation_space.spaces, "Must have 'state' key"
+        # Chọn device
+        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        # Get dimensions
+        # Validate observation space
+        assert isinstance(observation_space, spaces.Dict), "Phải dùng Dict observation space"
+        assert 'image' in observation_space.spaces, "Phải có key 'image'"
+        assert 'state' in observation_space.spaces, "Phải có key 'state'"
+        
+        # Lấy shape
         self.image_shape = observation_space['image'].shape
         self.state_dim = observation_space['state'].shape[0]
-        
-        print(f"\n{'='*60}")
-        print(f"Initializing VisionStateExtractor")
-        print(f"{'='*60}")
-        print(f"Image shape: {self.image_shape}")
-        print(f"State dim: {self.state_dim}")
-        print(f"Vision encoder: {vision_encoder}")
-        
-        # Create vision encoder
+
+        # Vision encoder
         if vision_encoder_kwargs is None:
             vision_encoder_kwargs = {}
-        
-        # Set default kwargs cho từng encoder type
-        if vision_encoder == 'dinov2' and 'model_name' not in vision_encoder_kwargs:
-            vision_encoder_kwargs['model_name'] = 'small'
-        if 'freeze' not in vision_encoder_kwargs:
-            vision_encoder_kwargs['freeze'] = True
-        
-        self.vision_encoder = create_vision_encoder(
-            vision_encoder,
-            **vision_encoder_kwargs
-        )
+        vision_encoder_kwargs.setdefault('model_name', 'small')  # default DINOv2-small
+        vision_encoder_kwargs.setdefault('freeze', True)         # freeze pre-trained weights
+        self.vision_encoder = create_vision_encoder(vision_encoder, **vision_encoder_kwargs).to(self.device)
         vision_feature_dim = self.vision_encoder.get_feature_dim()
-        print(f"Vision features: {vision_feature_dim}")
-        
-        # State encoder (simple MLP)
+
+        # State encoder (MLP nhỏ)
         self.normalize_state = normalize_state
         if normalize_state:
-            self.state_normalizer = nn.LayerNorm(self.state_dim)
-        
+            self.state_normalizer = nn.LayerNorm(self.state_dim).to(self.device)
         self.state_encoder = nn.Sequential(
             nn.Linear(self.state_dim, state_hidden_dim),
             nn.ReLU(),
             nn.Linear(state_hidden_dim, state_hidden_dim),
             nn.ReLU()
-        )
-        print(f"State features: {state_hidden_dim}")
-        
-        # Fusion network
+        ).to(self.device)
+
+        # Fusion network: concat vision + state → final features
         combined_dim = vision_feature_dim + state_hidden_dim
         self.fusion_net = nn.Sequential(
             nn.Linear(combined_dim, features_dim),
-            nn.ReLU(),
-        )
-        
-        print(f"Combined dim: {combined_dim}")
-        print(f"Output features: {features_dim}")
-        
-        # Count parameters
-        total_params = sum(p.numel() for p in self.parameters())
-        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
-        print(f"\nTotal params: {total_params:,}")
-        print(f"Trainable params: {trainable_params:,}")
-        print(f"Frozen params: {total_params - trainable_params:,}")
-        print(f"{'='*60}\n")
-    
+            nn.ReLU()
+        ).to(self.device)
+
+        # Thông tin
+        print(f"\n[VisionStateExtractor] Image shape: {self.image_shape}, State dim: {self.state_dim}")
+        print(f"[VisionStateExtractor] Vision features: {vision_feature_dim}, State features: {state_hidden_dim}, Output features: {features_dim}")
+
     def forward(self, observations):
         """
         Args:
-            observations: Dict với 'image' và 'state'
-                - image: [batch, H, W, C] values in [0, 1]
-                - state: [batch, state_dim]
-        
+            observations: dict {'image': [B,H,W,C], 'state': [B,state_dim]}
         Returns:
-            features: [batch, features_dim]
+            features: [B, features_dim]
         """
-        # Extract image features
-        image = observations['image']
-        vision_features = self.vision_encoder(image)
-        
-        # Extract state features
-        state = observations['state']
+        image = observations['image'].to(self.device).float()
+        state = observations['state'].to(self.device).float()
         if self.normalize_state:
             state = self.state_normalizer(state)
         state_features = self.state_encoder(state)
-        
-        # Concatenate
+        vision_features = self.vision_encoder(image)
         combined = torch.cat([vision_features, state_features], dim=1)
-        
-        # Final fusion
         features = self.fusion_net(combined)
-        
         return features
 
 

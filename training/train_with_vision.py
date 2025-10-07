@@ -79,22 +79,20 @@ def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, u
         use_subproc: Use SubprocVecEnv (faster but may flatten Dict spaces)
                      Set to False for Dict observation spaces
     """
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     print("\n" + "="*70)
-    print("TRAINING: DINOv2 (frozen) + State")
+    print(f"TRAINING: DINOv2 (frozen) + State on device {device}")
     print("="*70 + "\n")
 
     # ===== CREATE TRAIN ENV =====
     env_fns = [make_env(rank=i, seed=42) for i in range(num_envs)]
-    
-    # DummyVecEnv preserves Dict observation spaces better
-    # SubprocVecEnv is faster but may have issues with Dict spaces
     if use_subproc:
         print(f"Using SubprocVecEnv (parallel execution)")
         env = SubprocVecEnv(env_fns, start_method='spawn')
     else:
         print(f"Using DummyVecEnv (sequential but stable for Dict spaces)")
         env = DummyVecEnv(env_fns)
-    
     print(f"✓ Created {num_envs} training environments")
     print(f"  Observation space: {env.observation_space}")
 
@@ -109,11 +107,13 @@ def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, u
             features_dim=256,
             vision_encoder='dinov2',
             vision_encoder_kwargs={
-                'model_name': 'small',  # 384-dim DINOv2-small
-                'freeze': True          # Frozen pre-trained weights
+                'model_name': 'small',
+                'freeze': True,
+                'device': device   # <-- đảm bảo encoder trên GPU
             },
             state_hidden_dim=64,
-            normalize_state=True
+            normalize_state=True,
+            device=device           # <-- đảm bảo state encoder trên GPU
         ),
         net_arch=[256, 256],
     )
@@ -132,7 +132,7 @@ def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, u
         clip_range=0.2,
         verbose=1,
         tensorboard_log="./logs/dinov2_multimodal/",
-        device='cuda' if torch.cuda.is_available() else 'cpu'
+        device=device
     )
 
     # ===== CALLBACKS =====

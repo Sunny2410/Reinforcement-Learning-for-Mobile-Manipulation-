@@ -11,12 +11,11 @@ from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.monitor import Monitor
-
 import torch
 import numpy as np
 
 # Import your environment
-from rl_mm.envs import SO101Arm2
+from rl_mm.envs import SO101Arm2, SO101Arm3
 
 # Import feature extractors
 from .feature_extractors import (
@@ -44,32 +43,43 @@ class SeedWrapper(gym.Wrapper):
 # ============================================================
 # STRATEGY 1: Vision + State (DINOv2) - RECOMMENDED
 # ============================================================
-def make_env(rank, seed=0, env_id="rl_mm/SO101-v2"):
+def make_env(rank, seed=0):
     """
     Tạo 1 environment instance với Monitor (ghi reward, ep_len, v.v)
     Dùng cho vectorized training
     """
     def _init():
-        # Khởi tạo env từ gym.make trực tiếp
-        env = gym.make(env_id, render_mode=None)
+        # Apply patches in this subprocess
+        apply_mujoco_patches()
         
-        # Monitor wrapper cho logging
+        env = SO101Arm3(render_mode=None)
+        
+        # Wrap with SeedWrapper for proper seeding
+        env = SeedWrapper(env, seed=seed + rank)
+        
+        # Monitor wrapper for logging
         env = Monitor(env, filename=f"./logs/dinov2_multimodal/monitor/env_{rank}")
         
-        # Set random seeds cho reproducibility
-        env.seed(seed + rank)
+        # Set random seeds for reproducibility
         np.random.seed(seed + rank)
         torch.manual_seed(seed + rank)
-
+        
         return env
     return _init
 
-def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000):
+
+def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, use_subproc: bool = False):
     """
     ✅ DINOv2 (frozen) + State encoder
-    - Multi-env training (SubprocVecEnv for parallel execution)
+    - Multi-env training
     - With Monitor logging
     - With checkpoint & eval callbacks
+    
+    Args:
+        num_envs: Number of parallel environments
+        total_timesteps: Total training steps
+        use_subproc: Use SubprocVecEnv (faster but may flatten Dict spaces)
+                     Set to False for Dict observation spaces
     """
     print("\n" + "="*70)
     print("TRAINING: DINOv2 (frozen) + State")
@@ -77,9 +87,18 @@ def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000):
 
     # ===== CREATE TRAIN ENV =====
     env_fns = [make_env(rank=i, seed=42) for i in range(num_envs)]
-    # Use SubprocVecEnv for true parallel execution (faster)
-    env = SubprocVecEnv(env_fns)
-    print(f"✓ Created {num_envs} training environments (SubprocVecEnv)")
+    
+    # DummyVecEnv preserves Dict observation spaces better
+    # SubprocVecEnv is faster but may have issues with Dict spaces
+    if use_subproc:
+        print(f"Using SubprocVecEnv (parallel execution)")
+        env = SubprocVecEnv(env_fns, start_method='spawn')
+    else:
+        print(f"Using DummyVecEnv (sequential but stable for Dict spaces)")
+        env = DummyVecEnv(env_fns)
+    
+    print(f"✓ Created {num_envs} training environments")
+    print(f"  Observation space: {env.observation_space}")
 
     # ===== CREATE EVAL ENV =====
     eval_env = DummyVecEnv([make_env(rank=999, seed=123)])

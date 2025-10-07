@@ -23,8 +23,7 @@ from .feature_extractors import (
     VisionOnlyExtractor,
     StateOnlyExtractor
 )
-os.environ['MUJOCO_GL'] = 'egl'
-os.environ['PYOPENGL_PLATFORM'] = 'egl'
+
 
 # ============================================================
 # ENVIRONMENT WRAPPERS

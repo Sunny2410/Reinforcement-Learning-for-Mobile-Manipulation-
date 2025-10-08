@@ -143,7 +143,7 @@ def train_multimodal_dinov2(num_envs: int = 8, total_timesteps: int = 10000, use
         env=env,
         policy_kwargs=policy_kwargs,
         learning_rate=1e-4,
-        n_steps=512,
+        n_steps=256,
         batch_size=32,
         n_epochs=10,
         gamma=0.99,

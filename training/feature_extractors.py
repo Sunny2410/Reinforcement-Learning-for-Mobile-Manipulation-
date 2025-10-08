@@ -169,6 +169,149 @@ class VisionOnlyExtractor(BaseFeaturesExtractor):
         
         return features
 
+class VisionStateRecurrentExtractor(BaseFeaturesExtractor):
+    """
+    Multi-modal Recurrent Feature Extractor:
+    - Vision: Frozen DINOv2 (or other pretrained encoder)
+    - State: MLP
+    - Fusion: Concatenate
+    - Temporal: GRU
+    ✅ GPU optimized
+    """
+
+    def __init__(
+        self,
+        observation_space: spaces.Dict,
+        features_dim: int = 256,
+        vision_encoder: str = 'dinov2',
+        vision_encoder_kwargs: dict = None,
+        state_hidden_dim: int = 64,
+        gru_hidden_dim: int = 512,
+        normalize_state: bool = True,
+        device: torch.device = None
+    ):
+        super().__init__(observation_space, features_dim)
+
+        # Device setup
+        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        assert isinstance(observation_space, spaces.Dict)
+        assert 'image' in observation_space.spaces and 'state' in observation_space.spaces
+
+        # ==========================
+        # 1️⃣ Vision Encoder
+        # ==========================
+        self.image_shape = observation_space['image'].shape
+        self.state_dim = observation_space['state'].shape[0]
+
+        if vision_encoder_kwargs is None:
+            vision_encoder_kwargs = {}
+        vision_encoder_kwargs.setdefault('model_name', 'small')
+        vision_encoder_kwargs.setdefault('freeze', True)
+        vision_encoder_kwargs['device'] = self.device
+
+        self.vision_encoder = create_vision_encoder(vision_encoder, **vision_encoder_kwargs)
+        self.vision_encoder.to(self.device)
+        vision_feature_dim = self.vision_encoder.get_feature_dim()
+
+        # Optional small adapter (trainable)
+        self.vision_adapter = nn.Sequential(
+            nn.Linear(vision_feature_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU()
+        )
+        vision_output_dim = 128
+
+        # ==========================
+        # 2️⃣ State Encoder
+        # ==========================
+        self.normalize_state = normalize_state
+        if normalize_state:
+            self.state_normalizer = nn.LayerNorm(self.state_dim)
+
+        self.state_encoder = nn.Sequential(
+            nn.Linear(self.state_dim, state_hidden_dim),
+            nn.ReLU(),
+            nn.Linear(state_hidden_dim, state_hidden_dim),
+            nn.ReLU()
+        )
+
+        # ==========================
+        # 3️⃣ Fusion + Temporal (GRU)
+        # ==========================
+        fused_dim = vision_output_dim + state_hidden_dim
+        self.gru = nn.GRU(
+            input_size=fused_dim,
+            hidden_size=gru_hidden_dim,
+            batch_first=True
+        )
+
+        # ==========================
+        # 4️⃣ Projection Head
+        # ==========================
+        self.projection = nn.Sequential(
+            nn.Linear(gru_hidden_dim, features_dim),
+            nn.ReLU()
+        )
+
+        # Move everything to device
+        self.to(self.device)
+
+        print(f"\n[VisionStateRecurrentExtractor]")
+        print(f"Device: {self.device}")
+        print(f"Image: {self.image_shape}, State: {self.state_dim}")
+        print(f"Vision Out: {vision_output_dim}, State Out: {state_hidden_dim}, GRU Hidden: {gru_hidden_dim}")
+        print(f"Output Feature Dim: {features_dim}\n")
+
+    # ==========================
+    # 🔁 Forward
+    # ==========================
+    def forward(self, observations, hidden_state=None):
+        """
+        observations: Dict('image', 'state')
+        hidden_state: optional previous GRU hidden state (for recurrent policy)
+        """
+        # Shape assumptions:
+        # image: [B, C, H, W] or [B, T, C, H, W]
+        # state: [B, state_dim] or [B, T, state_dim]
+
+        image = observations['image'].to(self.device).float()
+        state = observations['state'].to(self.device).float()
+
+        # Handle time dimension (T)
+        if image.dim() == 5:  # [B, T, C, H, W]
+            B, T = image.shape[:2]
+            image = image.view(B * T, *image.shape[2:])
+            state = state.view(B * T, state.shape[-1])
+        else:
+            B, T = image.shape[0], 1
+
+        # Vision encoding
+        vision_features = self.vision_encoder(image)
+        vision_features = self.vision_adapter(vision_features)
+
+        # State encoding
+        if self.normalize_state:
+            state = self.state_normalizer(state)
+        state_features = self.state_encoder(state)
+
+        # Fuse and reshape for GRU
+        fused = torch.cat([vision_features, state_features], dim=-1)
+        fused = fused.view(B, T, -1)
+
+        # GRU temporal encoding
+        gru_out, new_hidden = self.gru(fused, hidden_state)
+
+        # Only return last timestep’s feature (SB3 expects [B, features_dim])
+        last_features = gru_out[:, -1, :]
+        out = self.projection(last_features)
+
+        return out, new_hidden
+
+    def get_initial_hidden_state(self, batch_size: int = 1):
+        """Return zero hidden state for GRU."""
+        return torch.zeros(1, batch_size, self.gru.hidden_size, device=self.device)
+
 
 class StateOnlyExtractor(BaseFeaturesExtractor):
     """State-only Feature Extractor - ✅ GPU Ready"""

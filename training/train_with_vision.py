@@ -21,7 +21,8 @@ from rl_mm.envs import SO101Arm2, SO101Arm3
 from .feature_extractors import (
     VisionStateExtractor,
     VisionOnlyExtractor,
-    StateOnlyExtractor
+    StateOnlyExtractor,
+    VisionStateRecurrentExtractor,
 )
 
 
@@ -66,7 +67,7 @@ def make_env(env_id="rl_mm/SO101-v2", seed=0, rank=0):
     return _init
 
 
-def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, use_subproc: bool = True):
+def train_multimodal_dinov2(num_envs: int = 8, total_timesteps: int = 10000, use_subproc: bool = False):
     """
     ✅ DINOv2 (frozen) + State encoder
     - Multi-env training
@@ -101,21 +102,39 @@ def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, u
     print("✓ Created evaluation environment")
 
     # ===== PPO POLICY CONFIG =====
+    # policy_kwargs = dict(
+    #     features_extractor_class=VisionStateExtractor,
+    #     features_extractor_kwargs=dict(
+    #         features_dim=256,
+    #         vision_encoder='dinov2',
+    #         vision_encoder_kwargs={
+    #             'model_name': 'small',
+    #             'freeze': True,
+    #             'device': device   # <-- đảm bảo encoder trên GPU
+    #         },
+    #         state_hidden_dim=64,
+    #         normalize_state=True,
+    #         device=device           # <-- đảm bảo state encoder trên GPU
+    #     ),
+    #     net_arch=[256, 256],
+    # )
+
     policy_kwargs = dict(
-        features_extractor_class=VisionStateExtractor,
+        features_extractor_class=VisionStateRecurrentExtractor,
         features_extractor_kwargs=dict(
-            features_dim=256,
-            vision_encoder='dinov2',
+            features_dim=256,                 # Output dimension after GRU
+            vision_encoder='dinov2',          # Use pretrained DINOv2 backbone
             vision_encoder_kwargs={
-                'model_name': 'small',
-                'freeze': True,
-                'device': device   # <-- đảm bảo encoder trên GPU
+                'model_name': 'small',        # DINOv2-small: balanced speed/quality
+                'freeze': True,               # Freeze encoder weights for stability
+                'device': device              # Ensure vision model is on GPU
             },
-            state_hidden_dim=64,
-            normalize_state=True,
-            device=device           # <-- đảm bảo state encoder trên GPU
+            state_hidden_dim=64,              # State embedding dimension
+            gru_hidden_dim=512,               # GRU memory size (temporal reasoning)
+            normalize_state=True,             # Normalize state input for stability
+            device=device                     # Put entire module on GPU
         ),
-        net_arch=[256, 256],
+        net_arch=[256, 256],                  # MLP after extractor (policy/value heads)
     )
 
     # ===== PPO MODEL =====
@@ -124,8 +143,8 @@ def train_multimodal_dinov2(num_envs: int = 4, total_timesteps: int = 200_000, u
         env=env,
         policy_kwargs=policy_kwargs,
         learning_rate=3e-4,
-        n_steps=512,
-        batch_size=64,
+        n_steps=256,
+        batch_size=32,
         n_epochs=10,
         gamma=0.99,
         gae_lambda=0.95,

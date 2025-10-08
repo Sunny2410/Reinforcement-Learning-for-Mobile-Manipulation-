@@ -8,6 +8,7 @@ import re
 import shutil
 import gymnasium as gym
 from stable_baselines3 import PPO, SAC
+from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.monitor import Monitor
@@ -122,24 +123,26 @@ def train_multimodal_dinov2(num_envs: int = 8, total_timesteps: int = 10000, use
     policy_kwargs = dict(
         features_extractor_class=VisionStateRecurrentExtractor,
         features_extractor_kwargs=dict(
-            features_dim=256,                 # Output dimension after GRU
-            vision_encoder='dinov2',          # Use pretrained DINOv2 backbone
+            features_dim=256,
+            vision_encoder='dinov2',
             vision_encoder_kwargs={
-                'model_name': 'small',        # DINOv2-small: balanced speed/quality
-                'freeze': True,               # Freeze encoder weights for stability
-                'device': device              # Ensure vision model is on GPU
+                'model_name': 'small',
+                'freeze': True,
+                'device': device
             },
-            state_hidden_dim=64,              # State embedding dimension
-            gru_hidden_dim=512,               # GRU memory size (temporal reasoning)
-            normalize_state=True,             # Normalize state input for stability
-            device=device                     # Put entire module on GPU
+            state_hidden_dim=64,
+            normalize_state=True,
+            device=device
         ),
-        net_arch=[256, 256],                  # MLP after extractor (policy/value heads)
+        lstm_hidden_size=512,  # ⭐ RecurrentPPO's LSTM size
+        n_lstm_layers=1,       # Number of LSTM layers
+        net_arch=[256, 256],   # MLP after LSTM
+        enable_critic_lstm=True,  # Share LSTM between actor/critic
     )
 
     # ===== PPO MODEL =====
-    model = PPO(
-        policy="MultiInputPolicy",
+    model = RecurrentPPO(
+        policy="MlpLstmPolicy",
         env=env,
         policy_kwargs=policy_kwargs,
         learning_rate=1e-4,

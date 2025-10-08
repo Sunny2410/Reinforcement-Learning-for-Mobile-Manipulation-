@@ -91,7 +91,6 @@ class ArmController:
         
         # 3. Calculate the absolute target position in the world frame. Now this is a valid addition.
         absolute_target_pos_world = curr_pos_world + target_pos_delta_world
-        print(absolute_target_pos_world )
 
         if absolute_target_pos_world[2] < self.floor_safety_offset:
             # print(f"⚠️  Arm Safety Check: Target Z ({absolute_target_pos_world[2]:.3f}) is below floor offset ({self.floor_safety_offset}). Action invalid.")

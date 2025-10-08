@@ -97,7 +97,7 @@ class SO101Arm3(gym.Env):
         self.penalty_time = 0.001     # Tiny per-step cost for efficiency
         
         # --- Episode settings & Tracking variables ---
-        self.max_episode_steps = 1000
+        self.max_episode_steps = 500
         self.current_step = 0
         self.stage_xy_aligned = False
         self.stage_grasped = False
